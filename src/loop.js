@@ -6,10 +6,7 @@ export function createLoop({ step = 1 / 60, simulate, render }) {
   function frame(currentTime) {
     const frameStart = performance.now()
 
-    const deltaTime = Math.min(
-      (currentTime - lastTime) / 1000,
-      0.25,
-    )
+    const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.25)
 
     lastTime = currentTime
     accumulator += deltaTime

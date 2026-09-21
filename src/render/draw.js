@@ -34,22 +34,14 @@ export function drawBackground(context, width, height) {
 
   for (let x = 20; x < width; x += 80) {
     for (let y = 20; y < height; y += 80) {
-      const value =
-        Math.sin(x * 12.9898 + y * 78.233) *
-        43758.5453
+      const value = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
 
       const random = value - Math.floor(value)
 
       const size = 1 + random * 2
 
       context.beginPath()
-      context.arc(
-        x,
-        y,
-        size,
-        0,
-        Math.PI * 2,
-      )
+      context.arc(x, y, size, 0, Math.PI * 2)
 
       context.fill()
     }
@@ -72,29 +64,17 @@ export function drawShip(context, ship) {
     const smokeScale = strongThrust ? 2 : 1
 
     for (let i = 0; i < 9; i++) {
-      const distance =
-        (35 + i * 9) * smokeScale
+      const distance = (35 + i * 9) * smokeScale
 
-      const size =
-        (3 + i * 1.2) * smokeScale
+      const size = (3 + i * 1.2) * smokeScale
 
       context.beginPath()
 
-      context.arc(
-        -distance,
-        Math.sin(i * 2.5) * 4,
-        size,
-        0,
-        Math.PI * 2,
-      )
+      context.arc(-distance, Math.sin(i * 2.5) * 4, size, 0, Math.PI * 2)
 
-      const alpha = Math.max(
-        0.05,
-        0.45 - i * 0.045,
-      )
+      const alpha = Math.max(0.05, 0.45 - i * 0.045)
 
-      context.fillStyle =
-        `rgba(180, 180, 190, ${alpha})`
+      context.fillStyle = `rgba(180, 180, 190, ${alpha})`
 
       context.fill()
     }
@@ -117,12 +97,7 @@ export function drawShip(context, ship) {
 
       context.closePath()
 
-      const blueFlame = context.createLinearGradient(
-        -100,
-        0,
-        -25,
-        0,
-      )
+      const blueFlame = context.createLinearGradient(-100, 0, -25, 0)
 
       blueFlame.addColorStop(0, '#1976ff')
       blueFlame.addColorStop(0.5, '#39a9ff')
@@ -140,13 +115,7 @@ export function drawShip(context, ship) {
 
       context.closePath()
 
-      const middleFlame =
-        context.createLinearGradient(
-          -72,
-          0,
-          -25,
-          0,
-        )
+      const middleFlame = context.createLinearGradient(-72, 0, -25, 0)
 
       middleFlame.addColorStop(0, '#4fc3ff')
       middleFlame.addColorStop(0.5, '#ffd84d')
@@ -253,62 +222,27 @@ export function drawShip(context, ship) {
 
   context.moveTo(45, 0)
 
-  context.quadraticCurveTo(
-    32,
-    -11,
-    10,
-    -13,
-  )
+  context.quadraticCurveTo(32, -11, 10, -13)
 
   context.lineTo(-25, -11)
 
-  context.quadraticCurveTo(
-    -35,
-    -6,
-    -38,
-    0,
-  )
+  context.quadraticCurveTo(-35, -6, -38, 0)
 
-  context.quadraticCurveTo(
-    -35,
-    6,
-    -25,
-    11,
-  )
+  context.quadraticCurveTo(-35, 6, -25, 11)
 
   context.lineTo(10, 13)
 
-  context.quadraticCurveTo(
-    32,
-    11,
-    45,
-    0,
-  )
+  context.quadraticCurveTo(32, 11, 45, 0)
 
   context.closePath()
 
-  const bodyGradient =
-    context.createLinearGradient(
-      0,
-      -14,
-      0,
-      14,
-    )
+  const bodyGradient = context.createLinearGradient(0, -14, 0, 14)
 
-  bodyGradient.addColorStop(
-    0,
-    '#f2f2f2',
-  )
+  bodyGradient.addColorStop(0, '#f2f2f2')
 
-  bodyGradient.addColorStop(
-    0.5,
-    '#bfc3c7',
-  )
+  bodyGradient.addColorStop(0.5, '#bfc3c7')
 
-  bodyGradient.addColorStop(
-    1,
-    '#686d73',
-  )
+  bodyGradient.addColorStop(1, '#686d73')
 
   context.fillStyle = bodyGradient
   context.fill()
@@ -354,38 +288,15 @@ export function drawShip(context, ship) {
 
   context.beginPath()
 
-  context.arc(
-    15,
-    0,
-    6,
-    0,
-    Math.PI * 2,
-  )
+  context.arc(15, 0, 6, 0, Math.PI * 2)
 
-  const windowGradient =
-    context.createRadialGradient(
-      16,
-      -2,
-      1,
-      15,
-      0,
-      6,
-    )
+  const windowGradient = context.createRadialGradient(16, -2, 1, 15, 0, 6)
 
-  windowGradient.addColorStop(
-    0,
-    '#e6f8ff',
-  )
+  windowGradient.addColorStop(0, '#e6f8ff')
 
-  windowGradient.addColorStop(
-    0.5,
-    '#54b9ff',
-  )
+  windowGradient.addColorStop(0.5, '#54b9ff')
 
-  windowGradient.addColorStop(
-    1,
-    '#1764a0',
-  )
+  windowGradient.addColorStop(1, '#1764a0')
 
   context.fillStyle = windowGradient
   context.fill()
@@ -400,13 +311,7 @@ export function drawShip(context, ship) {
 
   context.beginPath()
 
-  context.arc(
-    -30,
-    0,
-    7,
-    0,
-    Math.PI * 2,
-  )
+  context.arc(-30, 0, 7, 0, Math.PI * 2)
 
   context.fillStyle = '#34383d'
   context.fill()

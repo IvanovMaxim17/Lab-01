@@ -24,14 +24,7 @@ export function createCanvas() {
     canvas.width = Math.floor(width * dpr)
     canvas.height = Math.floor(height * dpr)
 
-    context.setTransform(
-      dpr,
-      0,
-      0,
-      dpr,
-      0,
-      0,
-    )
+    context.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
   window.addEventListener('resize', resize)

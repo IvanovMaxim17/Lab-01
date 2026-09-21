@@ -3,10 +3,7 @@ import { createInput } from './input.js'
 import { createShip, integrate } from './sim/ship.js'
 import { wrapShip } from './sim/arena.js'
 import { createCanvas } from './render/canvas.js'
-import {
-  drawBackground,
-  drawShip,
-} from './render/draw.js'
+import { drawBackground, drawShip } from './render/draw.js'
 
 const app = document.querySelector('#app')
 
@@ -27,6 +24,8 @@ const input = createInput()
 const ship = createShip()
 const canvas = createCanvas()
 
+
+
 let previousShip = { ...ship }
 
 let totalSteps = 0
@@ -36,67 +35,113 @@ let lastMetricsTime = performance.now()
 let stepsPerSecond = 0
 let framesPerSecond = 0
 
+let experimentBusyWait = false
+let experimentFrameTime = 0
+
+function busyWait(milliseconds) {
+const end = performance.now() + milliseconds
+
+while (performance.now() < end) {
+// Intentionally block the main thread.
+}
+}
+
 function lerp(a, b, alpha) {
-  return a + (b - a) * alpha
+return a + (b - a) * alpha
 }
 
 function lerpAngle(a, b, alpha) {
-  let difference = b - a
+let difference = b - a
 
-  while (difference > Math.PI) {
-    difference -= Math.PI * 2
-  }
+while (difference > Math.PI) {
+difference -= Math.PI * 2
+}
 
-  while (difference < -Math.PI) {
-    difference += Math.PI * 2
-  }
+while (difference < -Math.PI) {
+difference += Math.PI * 2
+}
 
-  return a + difference * alpha
+return a + difference * alpha
 }
 
 const loop = createLoop({
-  simulate(deltaTime) {
-    previousShip = { ...ship }
+simulate(deltaTime) {
+previousShip = { ...ship }
 
-    integrate(ship, input, deltaTime)
+const nextShip = integrate(
+  ship,
+  input,
+  deltaTime,
+)
 
-    wrapShip(ship, canvas.width, canvas.height)
+wrapShip(
+  nextShip,
+  canvas.width,
+  canvas.height,
+)
 
-    totalSteps++
-  },
+ship.x = nextShip.x
+ship.y = nextShip.y
+ship.vx = nextShip.vx
+ship.vy = nextShip.vy
+ship.angle = nextShip.angle
+ship.thrust = nextShip.thrust
+ship.thrustTime = nextShip.thrustTime
 
-  render(alpha, steps, frameTime) {
-    frames++
+totalSteps++
 
-    const now = performance.now()
+},
 
-    if (now - lastMetricsTime >= 1000) {
-      stepsPerSecond = totalSteps
-      framesPerSecond = frames
+render(alpha, steps, frameTime) {
+frames++
 
-      totalSteps = 0
-      frames = 0
-      lastMetricsTime = now
-    }
+if (
+  experimentBusyWait &&
+  totalSteps % 60 === 0
+) {
+  const start = performance.now()
 
-    hud.textContent =
-      `Steps/s: ${stepsPerSecond} | ` +
-      `Frames/s: ${framesPerSecond} | ` +
-      `Frame time: ${frameTime.toFixed(2)} ms`
+  busyWait(100)
 
-    const renderX = lerp(
-      previousShip.x,
-      ship.x,
-      alpha,
-    )
+  experimentFrameTime =
+    performance.now() - start
+}
 
-    const renderY = lerp(
-      previousShip.y,
-      ship.y,
-      alpha,
-    )
+const now = performance.now()
 
-    const renderAngle = lerpAngle(
+if (now - lastMetricsTime >= 1000) {
+  stepsPerSecond = totalSteps
+  framesPerSecond = frames
+
+  totalSteps = 0
+  frames = 0
+  lastMetricsTime = now
+}
+
+hud.textContent =
+  'Steps/s: ' +
+  stepsPerSecond +
+  ' | Frames/s: ' +
+  framesPerSecond +
+  ' | Frame time: ' +
+  frameTime.toFixed(2) +
+  ' ms | Busy wait: ' +
+  experimentFrameTime.toFixed(0) +
+  ' ms'
+
+const renderX = lerp(
+  previousShip.x,
+  ship.x,
+  alpha,
+)
+
+const renderY = lerp(
+  previousShip.y,
+  ship.y,
+  alpha,
+)
+
+const renderAngle = lerpAngle(
   previousShip.angle,
   ship.angle,
   alpha,
@@ -109,7 +154,7 @@ const renderShip = {
   angle: renderAngle,
 }
 
-    drawBackground(
+drawBackground(
   canvas.context,
   canvas.width,
   canvas.height,
@@ -119,7 +164,8 @@ drawShip(
   canvas.context,
   renderShip,
 )
-  },
+
+},
 })
 
 loop.start()

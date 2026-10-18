@@ -1,63 +1,60 @@
-export function createShip() {
-  return {
-    x: 400,
-    y: 300,
-    vx: 0,
-    vy: 0,
-    angle: 0,
-    thrust: 0,
-    thrustTime: 0,
-  }
-}
 
-export function integrate(ship, input, dt) {
-  const rotationSpeed = 3
-  const acceleration = ship.thrustTime > 2 ? 400 : 200
-  const drag = 0.99
-  const maxSpeed = ship.thrustTime > 2 ? 1000 : 500
+import { Entity } from './entity.js';
+import { Vector2 } from './vector.js';
+import { Bullet } from './bullet.js';
 
-  let angle = ship.angle
-  let vx = ship.vx
-  let vy = ship.vy
-  let thrust = 0
-  let thrustTime = 0
+export class Ship extends Entity {
+  #hp;
 
-  if (input.isDown('KeyA')) {
-    angle -= rotationSpeed * dt
-  }
+  constructor({
+    pos = new Vector2(),
+    vel = new Vector2(),
+    angle = 0,
+    radius = 15,
+    hp = 3,
+  } = {}) {
+    super({
+      pos,
+      vel,
+      angle,
+      radius,
+      kind: 'ship',
+    });
 
-  if (input.isDown('KeyD')) {
-    angle += rotationSpeed * dt
+    this.#hp = hp;
+    this.score = 0;
+    this.invulnerable = false;
   }
 
-  if (input.isDown('KeyW')) {
-    thrust = 1
-    thrustTime = ship.thrustTime + dt
-
-    vx += Math.cos(angle) * acceleration * dt
-    vy += Math.sin(angle) * acceleration * dt
+  get hp() {
+    return this.#hp;
   }
 
-  vx *= drag
-  vy *= drag
+  takeDamage(amount = 1) {
+    if (this.invulnerable || !this.alive) return;
 
-  const speed = Math.sqrt(vx * vx + vy * vy)
+    this.#hp -= amount;
 
-  if (speed > maxSpeed) {
-    const scale = maxSpeed / speed
-
-    vx *= scale
-    vy *= scale
+    if (this.#hp <= 0) {
+      this.destroy();
+    }
   }
 
-  return {
-    ...ship,
-    angle,
-    vx,
-    vy,
-    thrust,
-    thrustTime,
-    x: ship.x + vx * dt,
-    y: ship.y + vy * dt,
+  fire() {
+    const direction = Vector2.fromAngle(this.angle);
+    const nose = this.pos.add(
+      direction.scale(this.radius + 5),
+    );
+
+    const bulletVelocity = this.vel.add(
+      direction.scale(400),
+    );
+
+    return new Bullet({
+      pos: nose,
+      vel: bulletVelocity,
+      angle: this.angle,
+      ownerId: this.id,
+    });
   }
 }

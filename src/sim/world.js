@@ -1,6 +1,7 @@
-
+﻿
 import { Vector2 } from './vector.js';
 import { createExplosion } from './particle.js';
+import { emitGameEvent } from '../events.js';
 
 export class World {
   constructor({ width = 800, height = 600 } = {}) {
@@ -50,7 +51,7 @@ export class World {
 
       entity.update(dt, this);
 
-      // Корабель і кулі переходять через краї екрана.
+      // РљРѕСЂР°Р±РµР»СЊ С– РєСѓР»С– РїРµСЂРµС…РѕРґСЏС‚СЊ С‡РµСЂРµР· РєСЂР°С— РµРєСЂР°РЅР°.
       if (entity.kind === 'ship' || entity.kind === 'bullet') {
         const x = ((entity.pos.x % this.width) + this.width) % this.width;
         const y = ((entity.pos.y % this.height) + this.height) % this.height;
@@ -61,7 +62,7 @@ export class World {
 
     this.#checkCollisions();
 
-    // Видаляємо знищені сутності після перевірки зіткнень.
+    // Р’РёРґР°Р»СЏС”РјРѕ Р·РЅРёС‰РµРЅС– СЃСѓС‚РЅРѕСЃС‚С– РїС–СЃР»СЏ РїРµСЂРµРІС–СЂРєРё Р·С–С‚РєРЅРµРЅСЊ.
     for (const [id, entity] of this.entities) {
       if (!entity.alive) {
         this.entities.delete(id);
@@ -85,22 +86,25 @@ export class World {
           continue;
         }
 
-        // Власник кулі також може отримати шкоду!
+        // Р’Р»Р°СЃРЅРёРє РєСѓР»С– С‚Р°РєРѕР¶ РјРѕР¶Рµ РѕС‚СЂРёРјР°С‚Рё С€РєРѕРґСѓ!
         const dx = Math.abs(bullet.pos.x - target.pos.x);
         const dy = Math.abs(bullet.pos.y - target.pos.y);
 
-        // Враховуємо близькість об'єктів через краї екрана.
+        // Р’СЂР°С…РѕРІСѓС”РјРѕ Р±Р»РёР·СЊРєС–СЃС‚СЊ РѕР±'С”РєС‚С–РІ С‡РµСЂРµР· РєСЂР°С— РµРєСЂР°РЅР°.
         const wrappedDx = Math.min(dx, this.width - dx);
         const wrappedDy = Math.min(dy, this.height - dy);
 
         const distance = Math.hypot(wrappedDx, wrappedDy);
 
         if (distance < bullet.radius + target.radius) {
+          emitGameEvent('hit', { bullet, target });
+
           if (typeof target.takeDamage === 'function') {
             target.takeDamage(bullet.damage);
 
-            // Вибух створюється, коли корабель знищено.
             if (target.kind === 'ship' && !target.alive) {
+              emitGameEvent('exploded', { entity: target });
+
               for (const particle of createExplosion(target.pos, {
                 count: 45,
                 speed: 220,
@@ -111,6 +115,10 @@ export class World {
             }
           } else {
             target.destroy();
+
+            if (target.kind === 'asteroid') {
+              emitGameEvent('exploded', { entity: target });
+            }
           }
 
           bullet.destroy();
@@ -120,3 +128,4 @@ export class World {
     }
   }
 }
+

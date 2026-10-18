@@ -1,0 +1,41 @@
+
+{
+  "version": 1,
+  "assets": {
+    "sprites": {
+      "ships": {
+        "url": "/assets/sprites/ships.svg",
+        "type": "image"
+      },
+      "bullets": {
+        "url": "/assets/sprites/bullets.svg",
+        "type": "image"
+      },
+      "asteroids": {
+        "url": "/assets/sprites/asteroids.svg",
+        "type": "image"
+      }
+    },
+    "audio": {
+      "shoot": {
+        "url": "/assets/audio/shoot.wav",
+        "type": "audio"
+      },
+      "hit": {
+        "url": "/assets/audio/hit.wav",
+        "type": "audio"
+      },
+      "explosion": {
+        "url": "/assets/audio/explosion.wav",
+        "type": "audio"
+      }
+    },
+    "data": {
+      "gameConfig": {
+        "url": "/assets/data/game-config.json",
+        "type": "json"
+      }
+    }
+  }
+}
+

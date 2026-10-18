@@ -1,0 +1,39 @@
+
+{
+  "game": {
+    "title": "SpaceFight",
+    "version": "3.0.0",
+    "width": 960,
+    "height": 600,
+    "background": "#080b18"
+  },
+  "player": {
+    "lives": 3,
+    "rotationSpeed": 3.5,
+    "acceleration": 220,
+    "maxSpeed": 320
+  },
+  "rooms": [
+    {
+      "id": "training",
+      "name": "Training Arena",
+      "description": "Спокійна арена для тренування",
+      "asteroidCount": 8,
+      "difficulty": "easy"
+    },
+    {
+      "id": "classic",
+      "name": "Classic Arena",
+      "description": "Класична битва з астероїдами",
+      "asteroidCount": 14,
+      "difficulty": "normal"
+    },
+    {
+      "id": "chaos",
+      "name": "Chaos Arena",
+      "description": "Більше астероїдів і небезпеки",
+      "asteroidCount": 22,
+      "difficulty": "hard"
+    }
+  ]
+}

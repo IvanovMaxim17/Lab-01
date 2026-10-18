@@ -1,0 +1,25 @@
+{
+  "rooms": [
+    {
+      "id": "training",
+      "name": "Training Arena",
+      "description": "Спокійна арена для тренування",
+      "asteroidCount": 8,
+      "difficulty": "easy"
+    },
+    {
+      "id": "classic",
+      "name": "Classic Arena",
+      "description": "Класична битва з астероїдами",
+      "asteroidCount": 14,
+      "difficulty": "normal"
+    },
+    {
+      "id": "chaos",
+      "name": "Chaos Arena",
+      "description": "Більше астероїдів і небезпеки",
+      "asteroidCount": 22,
+      "difficulty": "hard"
+    }
+  ]
+}

@@ -184,3 +184,132 @@ The respawn system creates a new ship after a delay and searches for a position 
 The second laboratory extends the original game loop with an object-oriented entity system. Encapsulation protects internal state, inheritance reuses common entity functionality, and composition allows behaviors to be added independently.
 
 The `World` class manages entity updates and collisions, while particles, pickups, homing projectiles, and respawning add gameplay features to SpaceFight.
+---
+
+# Lab 03 — Async JavaScript
+
+## Implemented
+
+- JSON asset manifest in `public/assets/manifest.json`.
+- Resource loaders: `loadImage`, `loadAudio`, and `loadJson`.
+- HTTP status validation and JSON parsing error handling.
+- `withRetry()` with exponential backoff and jitter.
+- No retry for HTTP 4xx errors; aborts stop retrying.
+- Concurrent resource loading through `Promise.all()`.
+- Per-resource loading progress displayed on the Canvas.
+- Game initialization waits for the required assets to load.
+- Sprite-sheet rendering for bullets and asteroids.
+- Web Audio API module with audio buffers decoded during loading.
+- Audio unlock after a user gesture.
+- Event-based communication between the simulation and audio module.
+- Lobby with player name and arena selection.
+- HTTP room loading, request timeout, refresh polling, and request cancellation.
+
+## Asset loading
+
+The manifest is stored in `public/assets/manifest.json`. It lists sprite images, audio files, and game configuration JSON.
+
+The loader starts independent asset requests concurrently with `Promise.all()`. A progress callback updates the loading screen as each resource finishes.
+
+The game starts only after `loadGameAssets()` successfully completes. If loading fails, the user can retry instead of starting with incomplete assets.
+
+### Sequential versus concurrent loading
+
+Sequential loading waits for each resource before requesting the next one:
+
+```js
+const results = [];
+
+for (const asset of assets) {
+  results.push(await loadAsset(asset));
+}
+
+
+Concurrent loading starts independent requests without waiting for earlier requests:
+const results = await Promise.all(
+  assets.map((asset) => loadAsset(asset))
+);
+
+
+Sequential loading time is approximately the sum of individual request durations. Concurrent loading time is closer to the duration of the slowest request, plus overhead, when requests can run independently.
+To compare them fairly, run both methods with the same resources under similar network conditions and record elapsed time with performance.now(). Actual timing depends on the browser, cache, server, and network.
+Retry and error handling
+withRetry() retries eligible transient failures using exponential backoff and jitter. HTTP 4xx responses are treated as client errors and are not retried. An aborted operation stops immediately.
+The JSON loader checks response.ok before parsing the response. Invalid JSON and unsuccessful HTTP responses produce errors rather than being silently accepted.
+Web Audio and game events
+src/audio/audio.js owns the AudioContext, decoded buffers, and playback. It unlocks audio after a user gesture and listens for game events.
+The simulation emits events through src/events.js:
+- fired — a projectile was fired.
+- hit — a collision hit occurred.
+- exploded — a target was destroyed or exploded.
+The simulation does not need to import the audio module to trigger sounds.
+Lobby
+The lobby is implemented in src/lobby.js, with DOM rendering separated into src/lobby-view.js.
+Room data is served from public/api/rooms.json. The player enters a name, selects an arena, and joins the game. Each arena specifies its asteroid count and difficulty.
+The lobby refreshes the room list periodically. Requests use an abort signal and a timeout, and polling is stopped when the player joins the game.
+Verification
+The following checks were performed during development:
+- Asset loader test: 7 of 7 resources loaded, progress reached 100%.
+- Lobby test: the Training and Chaos arenas both started successfully.
+- Abort test: the request was cancelled successfully using AbortController.
+- Production build: npm.cmd run build completed successfully.
+The diagnostic pages are public/loader-test.html and public/abort-test.html. These are development test pages, not part of the main game interface.
+Event Loop exercises
+Puzzle 1 — Promise and timer
+console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+
+
+Output: A D C B
+Explanation: synchronous statements run first, then the Promise callback, then the timer callback.
+Puzzle 2 — Nested microtask
+console.log(1);
+Promise.resolve().then(() => {
+  console.log(2);
+  Promise.resolve().then(() => console.log(3));
+});
+Promise.resolve().then(() => console.log(4));
+console.log(5);
+
+
+Output: 1 5 2 4 3
+Explanation: microtasks run in queue order; the nested callback is queued after the already scheduled callback that prints 4.
+Puzzle 3 — async and await
+async function run() {
+  console.log('A');
+  await Promise.resolve();
+  console.log('B');
+}
+
+console.log('C');
+run();
+console.log('D');
+
+
+Output: C A D B
+Explanation: await suspends the async function and resumes it through a microtask.
+Puzzle 4 — Timer inside a Promise callback
+Promise.resolve().then(() => {
+  console.log('A');
+  setTimeout(() => console.log('B'), 0);
+});
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+
+
+Output: D A C B
+Explanation: the synchronous log runs first, both queued Promise callbacks run before the timer callback.
+Puzzle 5 — requestAnimationFrame
+console.log('A');
+requestAnimationFrame(() => console.log('B'));
+Promise.resolve().then(() => console.log('C'));
+setTimeout(() => console.log('D'), 0);
+console.log('E');
+
+
+Output: A E C D B in a typical browser run where the timer fires before the next animation frame.
+Explanation: synchronous code and microtasks run first; timers and animation-frame callbacks are scheduled by different browser mechanisms, so their relative order is not guaranteed in every situation.
+Reflection
+Asynchronous loading prevents the game from waiting for each independent asset one at a time. Retry logic and abort signals help control failed or unnecessary requests. The lobby separates room selection from gameplay, while custom events keep simulation logic independent of audio playback.

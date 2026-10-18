@@ -1,0 +1,40 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Тест AbortSignal — Lab 03</title>
+</head>
+<body>
+  <h1>Тест скасування завантаження</h1>
+  <button id="test">Запустити тест</button>
+  <pre id="result">Натисни кнопку для початку тесту.</pre>
+
+  <script type="module">
+    import { fetchJson } from '/src/assets/loader.js';
+
+    const result = document.querySelector('#result');
+
+    document.querySelector('#test').addEventListener('click', async () => {
+      const controller = new AbortController();
+      result.textContent = 'Запит розпочато…';
+
+      const request = fetchJson('/api/rooms.json?abort-test=' + Date.now(), {
+        signal: controller.signal,
+      });
+
+      setTimeout(() => controller.abort(), 0);
+
+      try {
+        await request;
+        result.textContent = 'Запит завершився до скасування. Повтори тест.';
+      } catch (error) {
+        if (controller.signal.aborted) {
+          result.textContent = 'УСПІХ: запит скасовано через AbortController.';
+        } else {
+          result.textContent = 'Інша помилка: ' + error.message;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

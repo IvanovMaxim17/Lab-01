@@ -1,0 +1,61 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тест завантажувача Lab 03</title>
+</head>
+<body>
+  <h1>Тест завантажувача Lab 03</h1>
+  <p id="status">Перевірка...</p>
+  <progress id="progress" value="0" max="100"></progress>
+  <pre id="output"></pre>
+
+  <script type="module">
+    import { fetchJson, loadAll } from '/src/assets/loader.js';
+
+    const status = document.querySelector('#status');
+    const progress = document.querySelector('#progress');
+    const output = document.querySelector('#output');
+
+    async function test() {
+      const audioContext = new AudioContext();
+
+      try {
+        status.textContent = 'Завантажуємо маніфест...';
+        const manifest = await fetchJson('/assets/manifest.json');
+
+        status.textContent = 'Завантажуємо всі ресурси паралельно...';
+
+        const loaded = await loadAll(manifest, {
+          audioContext,
+          onProgress(info) {
+            progress.value = info.percent;
+            output.textContent =
+              `Завантажено: ${info.loaded}/${info.total}\n` +
+              `Прогрес: ${info.percent}%\n` +
+              `Останній ресурс: ${info.current ?? '—'}`;
+          }
+        });
+
+        status.textContent = 'Усі ресурси успішно завантажено!';
+        output.textContent +=
+          '\n\nСпрайти: ' + Object.keys(loaded.sprites).join(', ') +
+          '\nАудіо: ' + Object.keys(loaded.audio).join(', ') +
+          '\nДані: ' + Object.keys(loaded.data).join(', ');
+
+        console.log('Усі ресурси завантажено:', loaded);
+      } catch (error) {
+        status.textContent = 'Помилка завантаження.';
+        output.textContent +=
+          `\n\n${error.name}: ${error.message}`;
+        console.error(error);
+      } finally {
+        await audioContext.close();
+      }
+    }
+
+    test();
+  </script>
+</body>
+</html>

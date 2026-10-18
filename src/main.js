@@ -1,3 +1,21 @@
+import { emitGameEvent } from './events.js';
+import { GameAudio } from './audio/audio.js';
+import { loadGameAssets } from './assets/game-assets.js';
+import { Lobby } from './lobby.js';
+import { renderLobby } from './lobby-view.js';
+function drawSpriteFrame(context, image, sx, sy, sw, sh, x, y, width, height, angle = 0) {
+  if (!image) return;
+
+  context.save();
+  context.translate(x, y);
+  context.rotate(angle);
+  context.drawImage(
+    image,
+    sx, sy, sw, sh,
+    -width / 2, -height / 2, width, height,
+  );
+  context.restore();
+}
 
 import { createLoop } from './loop.js';
 import { createInput } from './input.js';
@@ -17,7 +35,7 @@ const app = document.querySelector('#app');
 app.innerHTML = '';
 
 const title = document.createElement('h1');
-title.textContent = 'SpaceFight — Lab 02';
+title.textContent = 'SpaceFight РІР‚вЂќ Lab 02';
 
 const hud = document.createElement('p');
 const controls = document.createElement('p');
@@ -26,8 +44,16 @@ controls.textContent =
 
 app.append(title, hud, controls);
 
+title.style.display = 'none';
+hud.style.display = 'none';
+controls.style.display = 'none';
+
+const lobbyContainer = document.createElement('div');
+app.append(lobbyContainer);
+
 const input = createInput();
 const canvas = createCanvas();
+canvas.canvas.style.display = 'none';
 
 const world = new World({
   width: canvas.width,
@@ -92,9 +118,7 @@ function spawnAsteroid() {
   );
 }
 
-for (let i = 0; i < 6; i++) {
-  spawnAsteroid();
-}
+// РђСЃС‚РµСЂРѕС—РґРё СЃС‚РІРѕСЂСЋСЋС‚СЊСЃСЏ РїС–СЃР»СЏ РІРёР±РѕСЂСѓ Р°СЂРµРЅРё РІ Lobby.
 
 world.spawn(
   new Pickup({
@@ -114,6 +138,7 @@ function fireBullet(homing = false) {
   }
 
   world.spawn(bullet);
+  emitGameEvent('fired', { bullet, ship: currentShip, homing });
 }
 
 const loop = createLoop({
@@ -219,16 +244,44 @@ const loop = createLoop({
           thrustTime: entity.thrustTime ?? 0,
         });
       } else if (entity.kind === 'bullet') {
-        canvas.context.fillStyle = '#ffe66d';
-        canvas.context.beginPath();
-        canvas.context.arc(x, y, entity.radius, 0, Math.PI * 2);
-        canvas.context.fill();
+        const bulletSprite = gameAssets?.sprites?.bullets;
+        const bulletFrame = entity.ownerId % 2 === 0 ? 0 : 1;
+
+        if (bulletSprite) {
+          drawSpriteFrame(
+            canvas.context,
+            bulletSprite,
+            bulletFrame * 16, 0, 16, 16,
+            x, y,
+            entity.radius * 3, entity.radius * 3,
+            entity.angle ?? 0,
+          );
+        } else {
+          canvas.context.fillStyle = '#ffe66d';
+          canvas.context.beginPath();
+          canvas.context.arc(x, y, entity.radius, 0, Math.PI * 2);
+          canvas.context.fill();
+        }
       } else if (entity.kind === 'asteroid') {
-        canvas.context.strokeStyle = '#a8b3c7';
-        canvas.context.lineWidth = 2;
-        canvas.context.beginPath();
-        canvas.context.arc(x, y, entity.radius, 0, Math.PI * 2);
-        canvas.context.stroke();
+        const asteroidSprite = gameAssets?.sprites?.asteroids;
+        const asteroidFrame = entity.id % 2 === 0 ? 0 : 1;
+
+        if (asteroidSprite) {
+          drawSpriteFrame(
+            canvas.context,
+            asteroidSprite,
+            asteroidFrame * 40, 0, 40, 40,
+            x, y,
+            entity.radius * 2.5, entity.radius * 2.5,
+            entity.angle ?? 0,
+          );
+        } else {
+          canvas.context.strokeStyle = '#a8b3c7';
+          canvas.context.lineWidth = 2;
+          canvas.context.beginPath();
+          canvas.context.arc(x, y, entity.radius, 0, Math.PI * 2);
+          canvas.context.stroke();
+        }
       } else if (entity.kind === 'pickup') {
         canvas.context.fillStyle =
           entity.type === 'shield' ? '#54b9ff' : '#7dff8a';
@@ -263,4 +316,144 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
-loop.start();
+let gameAssets = null;
+const gameAudio = new GameAudio();
+let isLoadingGame = false;
+let retryButton = null;
+let loadingError = null;
+
+async function unlockGameAudio() {
+  try {
+    await gameAudio.unlock();
+
+    if (gameAudio.unlocked) {
+      document.removeEventListener('pointerdown', unlockGameAudio);
+      document.removeEventListener('keydown', unlockGameAudio);
+    }
+  } catch (error) {
+    console.warn('РќРµ РІРґР°Р»РѕСЃСЏ Р°РєС‚РёРІСѓРІР°С‚Рё Р°СѓРґС–Рѕ:', error);
+  }
+}
+
+document.addEventListener('pointerdown', unlockGameAudio);
+document.addEventListener('keydown', unlockGameAudio);
+
+async function startGame() {
+  if (isLoadingGame) return;
+
+  isLoadingGame = true;
+  retryButton?.remove();
+  retryButton = null;
+  loadingError?.remove();
+  loadingError = null;
+
+  try {
+    const assets = await loadGameAssets(canvas, gameAudio.context);
+    gameAssets = assets;
+    gameAudio.setBuffers(assets.audio);
+
+    loop.start();
+  } catch (error) {
+    console.error('РџРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ РіСЂРё:', error);
+
+    loadingError = document.createElement('p');
+    loadingError.textContent =
+      `РќРµ РІРґР°Р»РѕСЃСЏ Р·Р°РІР°РЅС‚Р°Р¶РёС‚Рё СЂРµСЃСѓСЂСЃРё: ${error.message}`;
+
+    retryButton = document.createElement('button');
+    retryButton.textContent = 'РЎРїСЂРѕР±СѓРІР°С‚Рё С‰Рµ СЂР°Р·';
+    retryButton.addEventListener('click', startGame);
+
+    app.append(loadingError, retryButton);
+  } finally {
+    isLoadingGame = false;
+  }
+}
+
+async function initializeLobby() {
+  const lobby = new Lobby();
+  let lobbyView = null;
+  let pollId = null;
+  let joining = false;
+
+  async function refreshLobby() {
+    try {
+      const rooms = await lobby.refresh();
+
+      if (!lobbyContainer.isConnected || joining) return;
+
+      if (!lobbyView) {
+        lobbyView = renderLobby(
+          lobbyContainer,
+          rooms,
+          joinLobby,
+          refreshLobby,
+        );
+      } else {
+        lobbyView.updateRooms(rooms);
+      }
+
+      lobbyView.setStatus(`Кімнат знайдено: ${rooms.length}`);
+    } catch (error) {
+      if (!lobbyContainer.isConnected || joining) return;
+
+      if (!lobbyView) {
+        lobbyView = renderLobby(
+          lobbyContainer,
+          [],
+          joinLobby,
+          refreshLobby,
+        );
+      }
+
+      lobbyView.setStatus(`Помилка завантаження кімнат: ${error.message}`);
+    }
+  }
+
+  async function joinLobby({ name, roomId }) {
+    if (joining) return;
+    joining = true;
+
+    try {
+      const room = lobby.join(roomId);
+
+      lobby.cancel();
+      clearInterval(pollId);
+
+      lobbyContainer.remove();
+      title.style.display = '';
+      hud.style.display = '';
+      controls.style.display = '';
+      canvas.canvas.style.display = 'block';
+
+      title.textContent = `SpaceFight — ${name} — ${room.name}`;
+
+      for (const asteroid of [...world.ofKind('asteroid')]) {
+        asteroid.destroy();
+      }
+
+      for (let i = 0; i < room.asteroidCount; i++) {
+        spawnAsteroid();
+      }
+
+      await startGame();
+    } catch (error) {
+      joining = false;
+      lobbyView?.setStatus(`Не вдалося увійти: ${error.message}`);
+    }
+  }
+
+  await refreshLobby();
+
+  if (lobbyContainer.isConnected) {
+    pollId = setInterval(() => {
+      void refreshLobby();
+    }, 10000);
+  }
+}
+
+initializeLobby();
+
+
+
+

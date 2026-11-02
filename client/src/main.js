@@ -3,6 +3,9 @@ import { GameAudio } from './audio/audio.js';
 import { loadGameAssets } from './assets/game-assets.js';
 import { Lobby } from './lobby.js';
 import { renderLobby } from './lobby-view.js';
+import { Connection } from './connection.js';
+import { createChatView } from './chat-view.js';
+
 function drawSpriteFrame(context, image, sx, sy, sw, sh, x, y, width, height, angle = 0) {
   if (!image) return;
 
@@ -35,7 +38,7 @@ const app = document.querySelector('#app');
 app.innerHTML = '';
 
 const title = document.createElement('h1');
-title.textContent = 'SpaceFight РІР‚вЂќ Lab 02';
+title.textContent = 'SpaceFight — Lab 02';
 
 const hud = document.createElement('p');
 const controls = document.createElement('p');
@@ -118,7 +121,7 @@ function spawnAsteroid() {
   );
 }
 
-// РђСЃС‚РµСЂРѕС—РґРё СЃС‚РІРѕСЂСЋСЋС‚СЊСЃСЏ РїС–СЃР»СЏ РІРёР±РѕСЂСѓ Р°СЂРµРЅРё РІ Lobby.
+// Астероїди створюються після вибору арени в Lobby.
 
 world.spawn(
   new Pickup({
@@ -331,7 +334,7 @@ async function unlockGameAudio() {
       document.removeEventListener('keydown', unlockGameAudio);
     }
   } catch (error) {
-    console.warn('РќРµ РІРґР°Р»РѕСЃСЏ Р°РєС‚РёРІСѓРІР°С‚Рё Р°СѓРґС–Рѕ:', error);
+    console.warn('Не вдалося активувати аудіо:', error);
   }
 }
 
@@ -354,14 +357,14 @@ async function startGame() {
 
     loop.start();
   } catch (error) {
-    console.error('РџРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ РіСЂРё:', error);
+    console.error('Помилка завантаження гри:', error);
 
     loadingError = document.createElement('p');
     loadingError.textContent =
-      `РќРµ РІРґР°Р»РѕСЃСЏ Р·Р°РІР°РЅС‚Р°Р¶РёС‚Рё СЂРµСЃСѓСЂСЃРё: ${error.message}`;
+      `Не вдалося завантажити ресурси: ${error.message}`;
 
     retryButton = document.createElement('button');
-    retryButton.textContent = 'РЎРїСЂРѕР±СѓРІР°С‚Рё С‰Рµ СЂР°Р·';
+    retryButton.textContent = 'Спробувати ще раз';
     retryButton.addEventListener('click', startGame);
 
     app.append(loadingError, retryButton);
@@ -436,6 +439,72 @@ async function initializeLobby() {
         spawnAsteroid();
       }
 
+      const connection = new Connection();
+
+      const chatView = createChatView(document.body, (text) => {
+        const sent = connection.send({
+          type: 'chat',
+          text,
+        });
+
+        if (!sent) {
+          chatView.setStatus('Повідомлення не надіслано: з’єднання зайняте');
+        }
+      });
+
+      connection.addEventListener('open', () => {
+        chatView.setStatus('Підключено. Вхід до кімнати...');
+
+        connection.send({
+          type: 'join',
+          roomId,
+          name,
+        });
+      });
+
+      connection.addEventListener('message', (event) => {
+        let message;
+
+        try {
+          message = JSON.parse(event.detail);
+        } catch {
+          console.error('Сервер надіслав некоректне повідомлення');
+          return;
+        }
+
+        if (message.type === 'joined') {
+          chatView.setStatus(`У кімнаті: ${message.room.playersCount} гравців`);
+        } else if (message.type === 'chat') {
+          chatView.addMessage({
+            name: message.name,
+            text: message.text,
+            time: message.time,
+          });
+        }
+      });
+
+      connection.addEventListener('close', () => {
+        chatView.setStatus('З’єднання втрачено. Спроба відновлення...');
+      });
+
+      connection.addEventListener('reconnecting', (event) => {
+        chatView.setStatus(
+          `Повторне підключення: спроба ${event.detail.attempt}`,
+        );
+      });
+
+      connection.addEventListener('error', () => {
+        chatView.setStatus('Помилка WebSocket-з’єднання');
+      });
+
+      connection.connect();
+
+      window.addEventListener(
+        'beforeunload',
+        () => connection.close(),
+        { once: true },
+      );
+
       await startGame();
     } catch (error) {
       joining = false;
@@ -453,7 +522,3 @@ async function initializeLobby() {
 }
 
 initializeLobby();
-
-
-
-

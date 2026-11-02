@@ -1,5 +1,6 @@
-﻿export class Lobby extends EventTarget {
-  constructor(url = '/api/rooms.json') {
+﻿
+export class Lobby extends EventTarget {
+  constructor(url = '/api/rooms') {
     super();
     this.url = url;
     this.rooms = [];
@@ -22,7 +23,9 @@
       const response = await fetch(this.url, { signal });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: не вдалося завантажити кімнати`);
+        throw new Error(
+          `HTTP ${response.status}: не вдалося завантажити кімнати`,
+        );
       }
 
       const data = await response.json();
@@ -32,13 +35,17 @@
       }
 
       this.rooms = data.rooms;
+
       this.dispatchEvent(
         new CustomEvent('rooms', { detail: this.rooms }),
       );
 
       return this.rooms;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (
+        error.name === 'AbortError' ||
+        error.name === 'TimeoutError'
+      ) {
         return [];
       }
 

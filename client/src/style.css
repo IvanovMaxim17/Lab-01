@@ -363,3 +363,106 @@ code {
   color: #dbe8ff;
   background: #263452;
 }
+
+/* Lab 04 — Chat */
+.chat-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
+  width: 300px;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  color: #eaf2ff;
+  background: linear-gradient(145deg, #151d36, #090d1b);
+  border: 1px solid #35466b;
+  border-radius: 14px;
+  box-shadow: 0 16px 50px #0008;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.chat-panel h2 {
+  margin: 0 0 8px;
+  color: #70c8ff;
+  font-size: 20px;
+}
+
+.chat-status {
+  margin-bottom: 10px;
+  color: #aab9d5;
+  font-size: 12px;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  background: #0a1022;
+  border: 1px solid #263452;
+  border-radius: 8px;
+}
+
+.chat-message {
+  padding: 8px;
+  background: #17233d;
+  border-radius: 7px;
+  overflow-wrap: anywhere;
+}
+
+.chat-message strong {
+  color: #70c8ff;
+  font-size: 13px;
+}
+
+.chat-message p {
+  margin: 4px 0;
+  color: #f2f6ff;
+  font-size: 14px;
+}
+
+.chat-message small {
+  color: #8293b2;
+  font-size: 10px;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-form input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px;
+  color: #f2f6ff;
+  background: #0a1022;
+  border: 1px solid #405477;
+  border-radius: 7px;
+}
+
+.chat-form button {
+  padding: 9px;
+  color: #06101e;
+  background: #70c8ff;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .chat-panel {
+    right: 10px;
+    bottom: 10px;
+    width: min(300px, calc(100% - 20px));
+    height: 320px;
+  }
+}

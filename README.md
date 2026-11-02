@@ -313,3 +313,75 @@ Output: A E C D B in a typical browser run where the timer fires before the next
 Explanation: synchronous code and microtasks run first; timers and animation-frame callbacks are scheduled by different browser mechanisms, so their relative order is not guaranteed in every situation.
 Reflection
 Asynchronous loading prevents the game from waiting for each independent asset one at a time. Retry logic and abort signals help control failed or unnecessary requests. The lobby separates room selection from gameplay, while custom events keep simulation logic independent of audio playback.
+
+
+---
+
+# Lab 04 — WebSocket Multiplayer and Server Architecture
+
+## Implemented
+
+- Split the project into `client/` and `server/` npm workspaces.
+- Node.js HTTP server serves the production client build.
+- REST API endpoints: `GET /api/rooms`, `POST /api/rooms`, and `GET /health`.
+- Vite development proxy for `/api` and `/ws`.
+- Environment-based server port and log directory configuration with port validation.
+- Room management using `EventEmitter`; empty rooms are removed when the last player leaves.
+- WebSocket multiplayer chat with room joining and leaving.
+- Five-second timeout for clients that do not join a room.
+- WebSocket heartbeat using ping/pong messages.
+- Incoming message validation, payload-size limit, and per-second rate limiting.
+- Client message queue while connecting and automatic reconnection with increasing delays.
+- Match event logging as NDJSON using an object-mode `Transform` and `pipeline()`.
+- Graceful shutdown handling for `SIGINT` and `SIGTERM`.
+
+## Client and server architecture
+
+The browser client connects to the Node.js server through a persistent WebSocket connection. Players join a room and can exchange chat messages with other players in that room.
+
+The server manages rooms and players. Room events are emitted through `EventEmitter`, keeping room state management separate from the code that records events.
+
+## WebSocket reliability and validation
+
+A client must join a room within five seconds after connecting. The server periodically sends ping messages and checks pong responses to detect disconnected clients.
+
+Incoming messages are parsed and validated before being processed. The server limits message payload size and the number of messages accepted per second. The client queues outgoing messages while the connection is being established and attempts to reconnect after an unexpected disconnection.
+
+## Match logging
+
+Match events are written to NDJSON files. An object-mode `Transform` converts each event object into a JSON line, and `pipeline()` connects the formatter to the file write stream.
+
+This allows events to be written incrementally instead of building one large JSON document in memory.
+
+## Verification
+
+The following checks were performed during development:
+
+- Production client build completed successfully.
+- The game and chat interface opened through the server.
+- Two browser windows joined the same room and exchanged chat messages.
+- The WebSocket connection was established successfully (`101 Switching Protocols`).
+- The client reconnected after the server was restarted.
+- NDJSON log files were created and contained server, room, player, and chat events.
+
+## Reflection
+
+### Why use WebSocket instead of repeated HTTP requests?
+
+WebSocket provides a persistent, full-duplex connection. Both client and server can send messages over the same connection without creating a new HTTP request for every message.
+
+### Why extend EventEmitter for rooms?
+
+EventEmitter allows room logic to emit events such as player joining or leaving. Other parts of the application can listen for those events without being tightly coupled to the room implementation.
+
+### Why validate incoming messages?
+
+Validation prevents malformed or unexpected data from reaching the application logic. Payload limits and rate limiting also reduce the risk of resource abuse.
+
+### Why use a Transform stream and pipeline for logging?
+
+The Transform converts event objects into NDJSON strings. Pipeline connects the transform and file stream and handles stream completion and errors.
+
+### Why is graceful shutdown important?
+
+The server should stop accepting new work, close active connections, and finish writing pending log data before the process exits.

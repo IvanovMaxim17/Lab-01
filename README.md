@@ -221,14 +221,14 @@ Sequential loading waits for each resource before requesting the next one:
 const results = [];
 
 for (const asset of assets) {
-  results.push(await loadAsset(asset));
-}
+  
+`
 
 
-Concurrent loading starts independent requests without waiting for earlier requests:
-const results = await Promise.all(
-  assets.map((asset) => loadAsset(asset))
-);
+
+`js
+
+`
 
 
 Sequential loading time is approximately the sum of individual request durations. Concurrent loading time is closer to the duration of the slowest request, plus overhead, when requests can run independently.

@@ -1,0 +1,1 @@
+how --stat --oneline HEAD

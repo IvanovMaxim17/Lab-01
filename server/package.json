@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "shared": "*",
     "ws": "^8.18.3"
   }
 }

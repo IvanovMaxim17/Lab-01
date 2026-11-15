@@ -1,0 +1,62 @@
+[33meb2808a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mlab-04[m[33m, [m[1;33mtag: [m[1;33mlab-04[m[33m, [m[1;31morigin/lab-04[m[33m)[m Complete Lab 04: WebSocket multiplayer chat and logging
+ eslint.config.js => client/eslint.config.js        |   0
+ index.html => client/index.html                    |   0
+ client/package.json                                |  19 [32m++[m
+ {public => client/public}/abort-test.html          |   0
+ {public => client/public}/api/rooms.json           |   0
+ .../public}/assets/audio/explosion.wav             | Bin
+ {public => client/public}/assets/audio/hit.wav     | Bin
+ {public => client/public}/assets/audio/shoot.wav   | Bin
+ .../public}/assets/data/game-config.json           |   0
+ {public => client/public}/assets/manifest.json     |   0
+ .../public}/assets/sprites/asteroids.svg           |   0
+ .../public}/assets/sprites/bullets.svg             |   0
+ {public => client/public}/assets/sprites/ships.svg |   0
+ {public => client/public}/favicon.svg              |   0
+ {public => client/public}/icons.svg                |   0
+ {public => client/public}/loader-test.html         |   0
+ {src => client/src}/assets/game-assets.js          |   0
+ {src => client/src}/assets/hero.png                | Bin
+ {src => client/src}/assets/javascript.svg          |   0
+ {src => client/src}/assets/loader-test.js          |   0
+ {src => client/src}/assets/loader.js               |   0
+ {src => client/src}/assets/loading-screen.js       |   0
+ {src => client/src}/assets/vite.svg                |   0
+ {src => client/src}/audio/audio.js                 |   0
+ client/src/chat-view.js                            |  76 [32m+++++[m
+ client/src/connection.js                           | 168 [32m++++++++++[m
+ {src => client/src}/counter.js                     |   0
+ {src => client/src}/events.js                      |   0
+ {src => client/src}/input.js                       |   0
+ {src => client/src}/lobby-view.js                  |   0
+ {src => client/src}/lobby.js                       |  15 [32m+[m[31m-[m
+ {src => client/src}/loop.js                        |   0
+ {src => client/src}/main.js                        |  87 [32m+++++[m[31m-[m
+ {src => client/src}/render/canvas.js               |   0
+ {src => client/src}/render/draw.js                 |   0
+ {src => client/src}/sim/arena.js                   |   0
+ {src => client/src}/sim/asteroid.js                |   0
+ {src => client/src}/sim/bullet.js                  |   0
+ {src => client/src}/sim/entity.js                  |   0
+ {src => client/src}/sim/homing.js                  |   0
+ {src => client/src}/sim/particle.js                |   0
+ {src => client/src}/sim/pickup.js                  |   0
+ {src => client/src}/sim/respawn.js                 |   0
+ {src => client/src}/sim/ship.js                    |   0
+ {src => client/src}/sim/vector.js                  |   0
+ {src => client/src}/sim/world.js                   |   0
+ {src => client/src}/style.css                      | 103 [32m+++++++[m
+ client/vite.config.js                              |  17 [32m++[m
+ package-lock.json                                  | 249 [32m+++++++++[m[31m------[m
+ package.json                                       |  25 [32m+[m[31m-[m
+ server/package.json                                |  13 [32m+[m
+ server/src/config.js                               |  26 [32m++[m
+ server/src/index.js                                | 339 [32m+++++++++++++++++++++[m
+ server/src/log/match-logger.js                     |  45 [32m+++[m
+ server/src/rooms.js                                |  79 [32m+++++[m
+ server/src/websocket.js                            | 241 [32m+++++++++++++++[m
+ server/test/join-timeout-check.js                  |  28 [32m++[m
+ server/test/logger-check.js                        |  26 [32m++[m
+ server/test/room-cleanup-check.js                  |  45 [32m+++[m
+ server/test/websocket-check.js                     |  95 [32m++++++[m
+ 60 files changed, 1571 insertions(+), 125 deletions(-)

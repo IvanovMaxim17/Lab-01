@@ -313,3 +313,69 @@ Output: A E C D B in a typical browser run where the timer fires before the next
 Explanation: synchronous code and microtasks run first; timers and animation-frame callbacks are scheduled by different browser mechanisms, so their relative order is not guaranteed in every situation.
 Reflection
 Asynchronous loading prevents the game from waiting for each independent asset one at a time. Retry logic and abort signals help control failed or unnecessary requests. The lobby separates room selection from gameplay, while custom events keep simulation logic independent of audio playback.
+
+
+---
+
+# Lab 05 — Authoritative Server: Prediction, Reconciliation, and Binary Protocol
+
+## Implemented
+
+- Shared deterministic simulation package (`shared/`) running identically in Node.js and the browser without DOM or Node-specific APIs.
+- Fixed-timestep simulation (`FIXED_DT = 1 / 30` s) with a seeded PRNG (`mulberry32`) replacing `Math.random()` and `Date.now()`.
+- Authoritative server loop running at **30 ticks/s** using target-time `setTimeout` scheduling (`performance.now()`) instead of `setInterval`, plus `/api/stats` tick duration and jitter telemetry.
+- Sequence-numbered (`seq`) client input commands (`turn`, `thrust`, `fire`) validated on the server via `clampInput()`.
+- Client-side prediction and server reconciliation for the local ship with exponential visual error smoothing (~100 ms), plus immediate local projectile feedback.
+- Snapshot interpolation buffer (**85 ms** delay) for smooth rendering of remote ships, asteroids, and projectiles.
+- Compact binary wire protocol built with `ArrayBuffer` and `DataView` (**little-endian**, protocol version byte `v1`, `Int16` angle quantization), with a live toggle to `JSON` for benchmarking.
+- Real-time **Netgraph** overlay (`F9`) displaying FPS, RTT, snapshot age, TX/RX bytes/s, unacknowledged input queue length, and reconciliation error in pixels, along with built-in latency, jitter, and packet-loss simulation presets.
+
+## Demo
+
+![SpaceFight Multiplayer Demo](./lab-05-demo.gif)
+
+## Binary Protocol vs JSON
+
+All real-time game messages (`INPUT`, `SNAPSHOT`, `PING`, `PONG`) are encoded into binary frames using `ArrayBuffer` and `DataView` in **little-endian** byte order (`PROTOCOL_VERSION = 1`). Angles are quantized into signed `Int16` values (`1 / 1000` rad, precision $\approx 0.057^\circ$). An `INPUT` frame takes **13 bytes**, while a `SNAPSHOT` frame uses a **16-byte** header plus **27 bytes** per entity.
+
+Measured in a live 2-player arena with 10 asteroids at 30 Hz:
+
+| Metric | Binary (`DataView`, LE) | JSON (Text) | Improvement |
+| :--- | :---: | :---: | :---: |
+| `INPUT` packet size (client $\to$ server) | **13 B** | ~70 B | **~5.4× smaller** |
+| Client outbound bandwidth (`TX`) | **~395 B/s** | **2,107 B/s** | **5.3× lower** |
+| `SNAPSHOT` packet size (12 entities) | **340 B** (`16 + 12×27`) | ~1,790 B | **~5.3× smaller** |
+| Client inbound bandwidth (`RX` at 30 Hz) | **~7,780 B/s** | **53,745 B/s** | **6.9× lower** |
+| Average server tick duration (`avgDurationMs`) | **0.306 ms** (budget: 33.33 ms) | — | < 1% CPU budget |
+
+## Network Architecture Write-Up
+
+### Handling Latency (Client-Side Prediction and Server Reconciliation)
+
+Without prediction, waiting for a round-trip to the server and snapshot interpolation adds 100–250 ms of input lag, making ship controls feel sluggish. To eliminate perceived input delay, the client applies local controls (`turn`, `thrust`, `fire`) immediately at `FIXED_DT = 1/30` s and stores each command in a pending queue tagged with a monotonically increasing `seq` number. When an authoritative server snapshot arrives containing `lastProcessedSeq`, the client resets the local ship to the authoritative server state, discards acknowledged commands (`seq <= lastProcessedSeq`), and replays any remaining unacknowledged inputs. Instead of snapping abruptly when a prediction discrepancy occurs, the position offset is smoothed out exponentially over roughly 100 ms.
+
+### Determinism and Causes of State Divergence
+
+Accurate reconciliation requires the client and server to produce identical results from the same inputs. Extracting the physics and collision rules into `shared/` and replacing `Math.random()` with a server-seeded `mulberry32` PRNG ensures deterministic execution across V8 in Node.js and the browser. During testing, temporarily injecting `Math.random()` noise into ship integration caused the Netgraph reconciliation metric to jump continuously from `0.00 px` to tens of pixels every tick, demonstrating how non-determinism forces constant state corrections even with zero packet loss.
+
+### Cheat Prevention (Authoritative Server Model)
+
+The client never transmits authoritative coordinates, velocities, health values, or hit confirmations. It sends only player intent (`turn`, `thrust`, `fire`), which the server sanitizes with `clampInput()`. Weapon cooldowns, projectile trajectories, collision detection, scoring, and respawn timers are computed exclusively on the server at 30 Hz. Even if a modified client alters local rendering or prediction state, the server overwrites invalid positions on the next snapshot, preventing speed hacks, teleportation, or unauthorized firing rates.
+
+### Choosing the Interpolation Delay
+
+The server broadcasts state snapshots every `33.33 ms` (30 Hz). Remote entities (other players' ships, asteroids, and projectiles) are rendered `85 ms` in the past ($\approx 2.5$ server tick intervals). This buffer guarantees that at least two surrounding snapshots (`snapA` and `snapB`) are normally available to interpolate smoothly across network jitter or a single dropped packet, while keeping visual lag low enough for accurate aiming during combat.
+
+## Reflection
+
+### Why are client coordinates not accepted by the server?
+
+In a multiplayer game, the client environment is untrusted and can be inspected or modified by a player. Accepting raw coordinates or hit claims from clients would allow trivial teleportation, invulnerability, or fire-rate cheats. Accepting only input intentions keeps the server as the single source of truth.
+
+### How does reconciliation work and why is `seq` needed?
+
+Because network packets take time to arrive, a server snapshot always reflects an older moment in time than the client's current frame. The `seq` identifier lets the server report `lastProcessedSeq`, telling the client exactly which inputs are already included in the snapshot so the client only re-simulates newer, unacknowledged inputs on top of the server state.
+
+### Why schedule server ticks on a target timestamp instead of `setInterval`?
+
+`setInterval` schedules callbacks relative to completion time and can drift or bunch up multiple ticks back-to-back if the Node.js event loop stalls. Tracking a target timestamp (`nextTargetTime += 1000 / 30`) and computing `Math.max(0, nextTargetTime - now)` maintains a steady 30 Hz simulation rate without cumulative clock drift.

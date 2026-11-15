@@ -1,6 +1,6 @@
-
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
+import { Match } from './match.js';
 
 export class Room extends EventEmitter {
   constructor(name, asteroidCount, difficulty) {
@@ -12,6 +12,13 @@ export class Room extends EventEmitter {
     this.difficulty = difficulty;
     this.players = new Set();
     this.createdAt = new Date().toISOString();
+
+    this.match = new Match({
+      width: 800,
+      height: 600,
+      asteroidCount,
+    });
+    this.match.start();
   }
 
   toJSON() {
@@ -21,6 +28,7 @@ export class Room extends EventEmitter {
       asteroidCount: this.asteroidCount,
       difficulty: this.difficulty,
       playersCount: this.players.size,
+      seed: this.match.seed,
       createdAt: this.createdAt,
     };
   }
@@ -71,9 +79,26 @@ export class RoomManager extends EventEmitter {
       return false;
     }
 
+    room.match.stop();
     this.rooms.delete(id);
     this.emit('roomDeleted', room);
 
     return true;
+  }
+
+  getStats() {
+    return Array.from(this.rooms.values(), (room) => ({
+      roomId: room.id,
+      roomName: room.name,
+      playersCount: room.players.size,
+      tick: room.match.tick,
+      ...room.match.stats,
+    }));
+  }
+
+  closeAll() {
+    for (const room of this.rooms.values()) {
+      room.match.stop();
+    }
   }
 }

@@ -1,10 +1,15 @@
-
 import { WebSocketServer } from 'ws';
+import {
+  TICK_RATE,
+  clampInput,
+  encodeMessage,
+  decodeMessage,
+} from 'shared';
 
 const MAX_MESSAGE_SIZE = 16 * 1024;
 const JOIN_TIMEOUT = 5000;
 const PING_INTERVAL = 15000;
-const MAX_MESSAGES_PER_SECOND = 10;
+const MAX_MESSAGES_PER_SECOND = 120;
 
 export function attachWebSocket(server, roomManager, logger) {
   const wss = new WebSocketServer({
@@ -50,7 +55,7 @@ export function attachWebSocket(server, roomManager, logger) {
       ws.missedPongs = 0;
     });
 
-    ws.on('message', (rawMessage) => {
+    ws.on('message', (rawMessage, isBinary) => {
       ws.messageCount += 1;
 
       if (ws.messageCount > MAX_MESSAGES_PER_SECOND) {
@@ -61,9 +66,13 @@ export function attachWebSocket(server, roomManager, logger) {
       let message;
 
       try {
-        message = JSON.parse(rawMessage.toString());
+        if (isBinary) {
+          message = decodeMessage(rawMessage);
+        } else {
+          message = JSON.parse(rawMessage.toString());
+        }
       } catch {
-        ws.close(1007, 'Invalid JSON');
+        ws.close(1007, isBinary ? 'Invalid binary frame' : 'Invalid JSON');
         return;
       }
 
@@ -76,6 +85,7 @@ export function attachWebSocket(server, roomManager, logger) {
         return;
       }
 
+      // 1. Вхід у кімнату та створення корабля у симуляції
       if (message.type === 'join') {
         if (ws.room) {
           ws.close(1008, 'Already joined');
@@ -100,9 +110,12 @@ export function attachWebSocket(server, roomManager, logger) {
 
         clearTimeout(joinTimer);
 
+        const format = message.format === 'json' ? 'json' : 'binary';
         ws.room = room;
         ws.playerName = name;
         room.players.add(ws);
+
+        const player = room.match.addPlayer(ws, name, format);
 
         room.emit('playerJoined', {
           name,
@@ -123,12 +136,58 @@ export function attachWebSocket(server, roomManager, logger) {
             type: 'joined',
             room: room.toJSON(),
             playerName: name,
+            playerId: player.id,
+            shipId: player.ship?.id ?? 0,
+            tickRate: TICK_RATE,
+            format: player.format,
           }));
         }
 
         return;
       }
 
+      // 2. Команди керування кораблем (бінарні або JSON)
+      if (message.type === 'input') {
+        if (!ws.room) {
+          ws.close(1008, 'Not in a room');
+          return;
+        }
+
+        const cleanInput = clampInput(message);
+        ws.room.match.enqueueInput(ws, cleanInput);
+        return;
+      }
+
+      // 3. Вимірювання затримки (RTT ping -> pong)
+      if (message.type === 'ping') {
+        if (ws.readyState === ws.OPEN) {
+          const player = ws.room?.match.getPlayer(ws);
+          const format = player?.format ?? (isBinary ? 'binary' : 'json');
+          const pongPayload = encodeMessage(
+            { type: 'pong', clientTime: Number(message.clientTime) || 0 },
+            format,
+          );
+          ws.send(pongPayload);
+        }
+        return;
+      }
+
+      // 4. Перемикання формату протоколу (binary <-> json) за прапорцем
+      if (message.type === 'format') {
+        if (!ws.room) return;
+        const nextFormat = message.format === 'json' ? 'json' : 'binary';
+        ws.room.match.setPlayerFormat(ws, nextFormat);
+
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'formatChanged',
+            format: nextFormat,
+          }));
+        }
+        return;
+      }
+
+      // 5. Чат кімнати (з 4-ї лабораторної)
       if (message.type === 'chat') {
         if (
           !ws.room ||
@@ -182,6 +241,7 @@ export function attachWebSocket(server, roomManager, logger) {
       if (ws.room) {
         const room = ws.room;
 
+        room.match.removePlayer(ws);
         room.players.delete(ws);
 
         room.emit('playerLeft', {

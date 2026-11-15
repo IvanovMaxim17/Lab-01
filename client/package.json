@@ -10,6 +10,9 @@
     "lint": "eslint .",
     "format": "prettier --write ."
   },
+  "dependencies": {
+    "shared": "*"
+  },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",

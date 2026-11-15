@@ -1,4 +1,3 @@
-
 import http from 'node:http';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -87,6 +86,15 @@ async function readJsonBody(req) {
 }
 
 async function handleApi(req, res, url) {
+  if (url.pathname === '/api/stats' && req.method === 'GET') {
+    sendJson(res, 200, {
+      uptime: Number(process.uptime().toFixed(2)),
+      rooms: roomManager.getStats(),
+    });
+
+    return true;
+  }
+
   if (url.pathname === '/api/rooms' && req.method === 'GET') {
     sendJson(res, 200, {
       rooms: roomManager.getRooms(),
@@ -304,6 +312,7 @@ function shutdown() {
   isShuttingDown = true;
   console.log('Shutting down server...');
 
+  roomManager.closeAll();
   webSocketServer.close();
 
   server.close(async (error) => {

@@ -11,9 +11,15 @@
   "scripts": {
     "dev": "npm --workspace client run dev",
     "dev:server": "npm --workspace server run dev",
-    "build": "npm --workspace client run build",
+    "build": "npm --workspace shared run build && npm --workspace server run build && npm --workspace client run build",
     "preview": "npm --workspace client run preview",
     "lint": "npm --workspace client run lint",
-    "test:shared": "node --test shared/test/*.test.js"
+    "test:shared": "node --test shared/test/*.test.js",
+    "typecheck": "npm --workspace shared run build && npm --workspace server run typecheck && npm --workspace client run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.10",
+    "@types/ws": "^8.18.2",
+    "typescript": "^7.0.2"
   }
 }

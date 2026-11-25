@@ -381,3 +381,25 @@ Because network packets take time to arrive, a server snapshot always reflects a
 ### Why schedule server ticks on a target timestamp instead of `setInterval`?
 
 `setInterval` schedules callbacks relative to completion time and can drift or bunch up multiple ticks back-to-back if the Node.js event loop stalls. Tracking a target timestamp (`nextTargetTime += 1000 / 30`) and computing `Math.max(0, nextTargetTime - now)` maintains a steady 30 Hz simulation rate without cumulative clock drift.
+---
+
+## Lab 06 — TypeScript Migration (`lab-06`)
+
+### Architectural & UI Framework Decision
+
+We deliberately kept **vanilla TypeScript + DOM API** for the lobby, chat panel, HUD, and Netgraph overlay rather than introducing React, Vue, or Svelte:
+- The UI surface is compact (~250 lines across `lobby-view.ts`, `chat-view.ts`, and the Netgraph overlay) with direct, low-frequency DOM updates.
+- Avoiding a UI framework keeps the production client bundle tiny (~38.7 kB uncompressed / ~13.3 kB gzipped), eliminates virtual-DOM diffing overhead alongside the 60 FPS Canvas loop, and introduces zero extra runtime dependencies.
+
+### Bugs Caught by TypeScript During Migration
+
+1. **Nullable DOM & Socket Boundaries (`strictNullChecks`):** `document.querySelector('#app')` and `canvas.getContext('2d')` can return `null`, and `connection.socket` can be `null` before `connect()`. Strict null checks forced explicit guard clauses instead of silent runtime `TypeError` crashes.
+2. **Array Indexing Under `noUncheckedIndexedAccess`:** Accessing `snapshotBuffer[i]` during snapshot interpolation or `localParticles[i]` during rendering evaluates to `T | undefined`, preventing out-of-bounds reads when buffer length changes mid-frame.
+3. **WebSocket `BufferSource` Narrowing:** `WebSocket.prototype.send()` in strict DOM typings rejects `ArrayBufferView<ArrayBufferLike>` (which includes `SharedArrayBuffer`). Restricting outbound binary views to `ArrayBufferView<ArrayBuffer>` prevented potential cross-realm buffer mismatches.
+4. **Exhaustive Protocol & Entity Switching:** Adding `assertNever(msg)` in `default` branches of `switch (msg.type)` and `switch (entity.kind)` guarantees at compile time that adding any new packet or entity variant produces a `tsc` error until handled everywhere.
+
+### Three Key TypeScript Concepts in Plain Words
+
+1. **Branded Types (`EntityId`, `PlayerId`, `Tick`, `Seq`):** At runtime they are plain numbers, so there is zero performance cost. At compile time, intersecting `number` with `{ readonly __brand: 'EntityId' }` prevents accidentally passing a simulation `Tick` or command `Seq` into a function expecting an `EntityId`.
+2. **Discriminated Unions + Exhaustive `never`:** Every network packet carries a literal `type` field (`'input' | 'snapshot' | 'ping' | ...`) and every entity carries a literal `kind` (`'ship' | 'bullet' | 'asteroid'`). Narrowing on that tag gives full autocomplete for variant-specific fields, while assigning the `default` branch to `never` lets the compiler prove no case was forgotten.
+3. **Schema-First Validation with `z.infer`:** Instead of maintaining separate TypeScript interfaces and runtime validators that drift apart, Zod schemas in `shared/src/protocol.ts` act as the single source of truth: `parseClientMessage(raw: unknown)` validates untrusted network input at runtime, while `z.infer<typeof ClientMessageSchema>` derives the static TypeScript type automatically.

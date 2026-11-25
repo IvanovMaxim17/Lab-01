@@ -4,10 +4,32 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.js",
-    "./sim": "./src/sim/index.js",
-    "./prng": "./src/prng.js",
-    "./protocol": "./src/protocol.js",
-    "./codec": "./src/codec.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./sim": {
+      "types": "./dist/sim/index.d.ts",
+      "default": "./dist/sim/index.js"
+    },
+    "./prng": {
+      "types": "./dist/prng.d.ts",
+      "default": "./dist/prng.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "default": "./dist/protocol.js"
+    },
+    "./codec": {
+      "types": "./dist/codec.d.ts",
+      "default": "./dist/codec.js"
+    }
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
   }
 }

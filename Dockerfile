@@ -12,9 +12,7 @@ COPY client/package.json ./client/
 
 RUN npm ci --legacy-peer-deps
 
-COPY shared ./shared
-COPY server ./server
-COPY client ./client
+COPY . .
 
 RUN npm run build
 
@@ -45,5 +43,3 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 
 CMD ["node", "server/dist/index.js"]
-
-

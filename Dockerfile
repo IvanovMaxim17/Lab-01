@@ -16,7 +16,7 @@ COPY shared ./shared
 COPY server ./server
 COPY client ./client
 
-RUN npm run build && npm prune --omit=dev
+RUN npm run build && npm prune --omit=dev --legacy-peer-deps
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -45,3 +45,4 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 
 CMD ["node", "server/dist/index.js"]
+

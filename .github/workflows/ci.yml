@@ -2,25 +2,24 @@
 
 on:
   push:
-    branches: ['*']
+    branches: ['**']
+    tags: ['lab-*', 'v*']
   pull_request:
+    branches: [main, master]
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Typecheck
         run: npm run typecheck
@@ -28,8 +27,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Shared unit tests
-        run: npm run test:shared
+      - name: Unit & Property Tests (Vitest)
+        run: npm run test:coverage
 
-      - name: Build all workspaces
+      - name: Build workspaces
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E Multiplayer Tests
+        run: npm run test:e2e

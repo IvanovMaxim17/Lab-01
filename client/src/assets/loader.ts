@@ -91,15 +91,14 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
     try {
       throwIfAborted(signal);
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
       return;
     }
 
     const onAbort = (): void => {
       clearTimeout(timer);
       reject(
-        signal?.reason ??
-          new DOMException('Завантаження скасовано', 'AbortError'),
+        signal?.reason instanceof Error ? signal.reason : new DOMException('Завантаження скасовано', 'AbortError'),
       );
     };
 
@@ -196,8 +195,7 @@ export async function loadImage(
         cleanup();
         image.src = '';
         reject(
-          signal?.reason ??
-            new DOMException('Завантаження скасовано', 'AbortError'),
+          signal?.reason instanceof Error ? signal.reason : new DOMException('Завантаження скасовано', 'AbortError'),
         );
       };
 
@@ -405,6 +403,7 @@ export async function loadAll(
     data: loadedData,
   };
 }
+
 
 
 

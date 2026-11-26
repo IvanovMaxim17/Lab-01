@@ -1,11 +1,12 @@
-﻿import http, { type IncomingMessage, type ServerResponse } from 'node:http';
+﻿import { performance } from 'node:perf_hooks';
+import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 import { config } from './config.js';
-import { RoomManager } from './rooms.js';
+import { RoomManager, type Room } from './rooms.js';
 import { attachWebSocket } from './websocket.js';
 import { createMatchLogger } from './log/match-logger.js';
 
@@ -34,7 +35,7 @@ logger.write({
   rooms: roomManager.getRooms(),
 });
 
-roomManager.on('roomCreated', (room) => {
+roomManager.on('roomCreated', (room: Room) => {
   logger.write({
     type: 'roomCreated',
     timestamp: new Date().toISOString(),
@@ -42,7 +43,7 @@ roomManager.on('roomCreated', (room) => {
   });
 });
 
-roomManager.on('roomDeleted', (room) => {
+roomManager.on('roomDeleted', (room: Room) => {
   logger.write({
     type: 'roomDeleted',
     timestamp: new Date().toISOString(),
@@ -75,7 +76,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const maxSize = 16 * 1024;
 
   for await (const chunk of req) {
-    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
     totalSize += buf.length;
 
     if (totalSize > maxSize) {
@@ -100,11 +101,42 @@ async function handleApi(
   url: URL,
 ): Promise<boolean> {
   if (url.pathname === '/api/stats' && req.method === 'GET') {
+    const elu = performance.eventLoopUtilization();
+    const mem = process.memoryUsage();
     sendJson(res, 200, {
       uptime: Number(process.uptime().toFixed(2)),
+      eventLoopUtilization: Number(elu.utilization.toFixed(4)),
+      rssBytes: mem.rss,
+      heapUsedBytes: mem.heapUsed,
       rooms: roomManager.getStats(),
     });
 
+    return true;
+  }
+
+  const botsMatch = /^\/api\/rooms\/([^/]+)\/bots$/.exec(url.pathname);
+  if (botsMatch && req.method === 'POST') {
+    const roomId = botsMatch[1] ?? '';
+    const room = roomManager.getRoom(roomId);
+    if (!room) {
+      sendJson(res, 404, { error: 'Room not found' });
+      return true;
+    }
+    let count = 1;
+    try {
+      const body = await readJsonBody(req);
+      if (typeof body === 'object' && body !== null && 'count' in body && typeof body.count === 'number') {
+        count = Math.max(1, Math.min(32, Math.floor(body.count)));
+      }
+    } catch {
+      count = 1;
+    }
+    const added: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const bot = room.match.addBot();
+      added.push(bot.name);
+    }
+    sendJson(res, 201, { added, botsCount: room.match.bots.size });
     return true;
   }
 
@@ -358,3 +390,5 @@ function shutdown(): void {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+

@@ -1,7 +1,6 @@
 ﻿import {
   fetchJson,
   loadAll,
-  type AssetManifest,
   type LoadedAssets,
   type LoadProgressInfo,
   type SignalOptions,
@@ -52,4 +51,5 @@ export async function loadGameAssets(
 
   return assets;
 }
+
 

@@ -99,6 +99,10 @@ type ServerMessage =
   | ChatServerMessage
   | FormatChangedServerMessage;
 
+function toServerMessage(msg: WireMessage): ServerMessage {
+  return msg;
+}
+
 function drawSpriteFrame(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement | undefined,
@@ -916,7 +920,11 @@ async function initializeLobby(): Promise<void> {
           const detail: unknown = event.detail;
         if (typeof detail !== 'string' && !(detail instanceof ArrayBuffer)) return;
         // Керуючі повідомлення сервера узгоджені зі схемою протоколу
-        message = decodeMessage(detail) as ServerMessage;
+        performance.mark('sf:decode:start');
+        // Керуючі повідомлення сервера узгоджені зі схемою протоколу
+        message = toServerMessage(decodeMessage(detail));
+        performance.mark('sf:decode:end');
+        performance.measure('sf:decode', 'sf:decode:start', 'sf:decode:end');
         } catch {
           console.error('Сервер надіслав некоректне повідомлення');
           return;
@@ -962,8 +970,10 @@ async function initializeLobby(): Promise<void> {
       });
 
       connection.addEventListener('reconnecting', (event: Event) => {
-        if (!(event instanceof CustomEvent) || typeof event.detail !== 'object' || event.detail === null) return;
-        const attempt = 'attempt' in event.detail && typeof event.detail.attempt === 'number' ? event.detail.attempt : 1;
+        if (!(event instanceof CustomEvent)) return;
+        const detail: unknown = event.detail;
+        if (typeof detail !== 'object' || detail === null) return;
+        const attempt = 'attempt' in detail && typeof detail.attempt === 'number' ? detail.attempt : 1;
         chatView.setStatus(
           `Повторне підключення: спроба ${attempt}`,
         );
@@ -1002,5 +1012,7 @@ async function initializeLobby(): Promise<void> {
 }
 
 void initializeLobby();
+
+
 
 

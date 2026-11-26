@@ -170,7 +170,8 @@ export function attachWebSocket(
 
       let rawJson: unknown;
       try {
-        rawJson = JSON.parse(rawMessage.toString());
+        const text = Array.isArray(rawMessage) ? Buffer.concat(rawMessage).toString('utf8') : rawMessage instanceof ArrayBuffer ? Buffer.from(rawMessage).toString('utf8') : rawMessage.toString('utf8');
+        rawJson = JSON.parse(text);
       } catch {
         ws.close(1007, 'Invalid JSON');
         return;
@@ -396,5 +397,6 @@ export function attachWebSocket(
     },
   };
 }
+
 
 

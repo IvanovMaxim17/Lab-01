@@ -54,7 +54,7 @@ export class Lobby extends EventTarget {
       }
 
       this.rooms = data.rooms.filter(
-        (item): item is LobbyRoom =>
+        (item: unknown): item is LobbyRoom =>
           typeof item === 'object' &&
           item !== null &&
           'id' in item &&
@@ -109,4 +109,5 @@ export class Lobby extends EventTarget {
     this.controller = null;
   }
 }
+
 

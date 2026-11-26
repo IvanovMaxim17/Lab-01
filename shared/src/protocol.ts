@@ -135,3 +135,67 @@ export function clampInput(raw: RawInput | null | undefined): PlayerInput {
 }
 
 
+
+import { z } from 'zod';
+
+export const ClientJoinSchema = z.object({
+  type: z.literal('join'),
+  roomId: z.string().min(1),
+  name: z.string().trim().min(1).max(20),
+  format: z.enum(['binary', 'json']).optional(),
+});
+
+export const ClientInputSchema = z.object({
+  type: z.literal('input'),
+  seq: z.number().int().nonnegative().optional(),
+  tick: z.number().int().nonnegative().optional(),
+  turn: z.number().finite().optional(),
+  thrust: z.union([z.number(), z.boolean()]).optional(),
+  fire: z.union([z.number(), z.boolean()]).optional(),
+});
+
+export const ClientPingSchema = z.object({
+  type: z.literal('ping'),
+  clientTime: z.number().finite().optional(),
+});
+
+export const ClientFormatSchema = z.object({
+  type: z.literal('format'),
+  format: z.enum(['binary', 'json']),
+});
+
+export const ClientChatSchema = z.object({
+  type: z.literal('chat'),
+  text: z.string().trim().min(1).max(500),
+});
+
+export const ClientLeaveSchema = z.object({
+  type: z.literal('leave'),
+});
+
+export const ClientMessageSchema = z.discriminatedUnion('type', [
+  ClientJoinSchema,
+  ClientInputSchema,
+  ClientPingSchema,
+  ClientFormatSchema,
+  ClientChatSchema,
+  ClientLeaveSchema,
+]);
+
+export type ClientMessage = z.infer<typeof ClientMessageSchema>;
+
+export type ParseClientMessageResult =
+  | { readonly ok: true; readonly data: ClientMessage }
+  | { readonly ok: false; readonly error: string };
+
+export function parseClientMessage(raw: unknown): ParseClientMessageResult {
+  const parsed = ClientMessageSchema.safeParse(raw);
+  if (parsed.success) {
+    return { ok: true, data: parsed.data };
+  }
+  const firstIssue = parsed.error.issues[0];
+  return {
+    ok: false,
+    error: firstIssue ? firstIssue.message : 'Invalid client message',
+  };
+}

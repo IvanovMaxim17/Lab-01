@@ -403,3 +403,47 @@ We deliberately kept **vanilla TypeScript + DOM API** for the lobby, chat panel,
 1. **Branded Types (`EntityId`, `PlayerId`, `Tick`, `Seq`):** At runtime they are plain numbers, so there is zero performance cost. At compile time, intersecting `number` with `{ readonly __brand: 'EntityId' }` prevents accidentally passing a simulation `Tick` or command `Seq` into a function expecting an `EntityId`.
 2. **Discriminated Unions + Exhaustive `never`:** Every network packet carries a literal `type` field (`'input' | 'snapshot' | 'ping' | ...`) and every entity carries a literal `kind` (`'ship' | 'bullet' | 'asteroid'`). Narrowing on that tag gives full autocomplete for variant-specific fields, while assigning the `default` branch to `never` lets the compiler prove no case was forgotten.
 3. **Schema-First Validation with `z.infer`:** Instead of maintaining separate TypeScript interfaces and runtime validators that drift apart, Zod schemas in `shared/src/protocol.ts` act as the single source of truth: `parseClientMessage(raw: unknown)` validates untrusted network input at runtime, while `z.infer<typeof ClientMessageSchema>` derives the static TypeScript type automatically.
+
+---
+
+## Лабораторна робота №7 — V8, оптимізація пам’яті та тестування (`lab-07`)
+
+### 1. Тестування (`Vitest` + `fast-check` + `Playwright`)
+- **68 модульних і property-based тестів** (`npm test`), покриття ядра `shared/` — **98.46%** (Statements: 98.46%, Branches: 89.28%, Functions: 98.71%, Lines: 99.06%).
+- **6 property-based інваріантів (`fast-check`)**:
+  1. Round-trip бінарного кодека (`INPUT` та `SNAPSHOT`) у межах похибки квантування кута `int16` (`< 0.002 rad`).
+  2. Відповідність довжини бінарних кадрів специфікації (`13 B` для `INPUT`, `10 B` для `PING/PONG`, `16 + 27 * N B` для `SNAPSHOT`).
+  3. Стійкість декодера до довільних пошкоджених буферів (лише контрольований `Error`, без аварійного завершення).
+  4. Інваріант меж арени (`0 <= x < 800`, `0 <= y < 600`) для корабля протягом 1000 випадкових кроків.
+  5. Валідація вхідних повідомлень `parseClientMessage` (прийняття валідних та відхилення мутованих пакетів).
+  6. Повнота просторового запиту `SpatialHash.query` без пропусків сусідів.
+- **Playwright E2E (`e2e/multiplayer.spec.ts`)**: запуск двох ізольованих браузерних контекстів в одній кімнаті, синхронізація руху корабля та миттєва доставка повідомлень чату.
+
+### 2. Профілювання V8 та оптимізація гарячих шляхів
+- **Клієнт (інструментація `performance.mark` / `performance.measure`)**:
+  - Впроваджено `ObjectPool<T>` для повторного використання об’єктів без зайвих алокацій у young generation.
+  - Винесено реконсиліацію у чисту функцію `reconcileShip` та стабілізовано форми об’єктів (hidden classes) у знімках сутностей.
+- **Сервер (`SpatialHash` $O(n)$ замість перебору $O(n^2)$)**:
+  - Бенчмарк на 120 астероїдах + 180 кулях протягом 300 тіків (`node scripts/bench-server.mjs`):
+
+| Режим колізій | p50 тіку (мс) | p95 тіку (мс) | p99 тіку (мс) |
+| :--- | :---: | :---: | :---: |
+| BruteForce $O(n^2)$ | 0.075 мс | 0.231 мс | 0.527 мс |
+| **SpatialHash $O(n)$** | **0.030 мс** | **0.084 мс** | **0.328 мс** |
+
+### 3. Експеримент із Web Worker (Go / No-Go)
+- Реалізовано `client/src/workers/particle-worker.ts` з передачею типізованого буфера `Float32Array` через **Transferable Objects** (`[data.buffer]`, zero-copy).
+- **Рішення (No-Go для малого обсягу, Go при > 1500 частинок)**: за типової кількості 40–120 частинок вибуху оновлення на головному потоці займає `< 0.04 мс`, тоді як накладні витрати `postMessage` + планування циклу подій становлять `0.15–0.35 мс`. Воркер доцільно вмикати лише при масових ефектах (> 1500 активних частинок).
+
+### 4. Серверні боти та навантажувальне тестування (`scripts/load-test.mjs`)
+- Додано AI-ботів (`BotController`), що використовують той самий інтерфейс `PlayerInput`, і REST-ендпоїнт `POST /api/rooms/:id/bots`.
+- Результати навантажувального тестування при бюджеті тіку **33.3 мс (30 Hz)**:
+
+| Одночасні клієнти ($N$) | Середній час тіку (мс) | Останній тік (мс) | Jitter (мс) | Event Loop Utilization | RSS пам’ять (МБ) | Вихідний трафік (КБ/с) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **8** | 0.767 мс | 0.620 мс | 3.397 мс | 5.33% | 71.3 МБ | 25.6 КБ/с |
+| **32** | 2.266 мс | 3.459 мс | 3.254 мс | 7.50% | 72.9 МБ | 348.0 КБ/с |
+| **64** | 3.756 мс | 3.032 мс | 3.387 мс | 9.96% | 77.3 МБ | 1322.9 КБ/с |
+| **128** | 7.907 мс | 8.633 мс | 2.913 мс | 15.41% | 99.2 МБ | 5273.7 КБ/с |
+
+- При 128 одночасних клієнтах у кімнаті сервер витрачає лише **7.91 мс** на тік (23.7% від бюджету 33.3 мс); основним обмежувачем при подальшому масштабуванні стає пропускна здатність мережевої серіалізації знімків (`$O(N^2)$` розсилка стану кожного гравця кожному).

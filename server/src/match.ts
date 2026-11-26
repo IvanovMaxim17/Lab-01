@@ -1,4 +1,4 @@
-﻿import { performance } from 'node:perf_hooks';
+﻿import { BotController } from './bot.js';
 import {
   World,
   Ship,
@@ -60,6 +60,7 @@ export class Match {
   readonly seed: number;
   readonly world: World;
   readonly players: Map<MatchWebSocket, MatchPlayer>;
+  readonly bots: Map<PlayerId, { controller: BotController; respawnTimer: number }>;
   nextPlayerId: number;
   tick: number;
   running: boolean;
@@ -83,6 +84,7 @@ export class Match {
     this.world.spawnAsteroids(asteroidCount);
 
     this.players = new Map();
+    this.bots = new Map();
     this.nextPlayerId = 1;
     this.tick = 0;
 
@@ -184,6 +186,15 @@ export class Match {
     player.format = format === 'json' ? 'json' : 'binary';
   }
 
+  addBot(name?: string): BotController {
+    const botId = asPlayerId(this.nextPlayerId++);
+    const botName = name ?? 'Bot-' + String(botId);
+    const bot = new BotController(botId, botName);
+    bot.ship = this.#spawnPlayerShip(botId, botName, 0);
+    this.bots.set(botId, { controller: bot, respawnTimer: 0 });
+    return bot;
+  }
+
   removePlayer(ws: MatchWebSocket): void {
     const player = this.players.get(ws);
     if (!player) return;
@@ -241,6 +252,27 @@ export class Match {
         player.respawnTimer -= FIXED_DT;
         if (player.respawnTimer <= 0) {
           player.ship = this.#spawnPlayerShip(player.id, player.name, player.score);
+        }
+      }
+    }
+
+    for (const entry of this.bots.values()) {
+      const bot = entry.controller;
+      if (bot.ship && bot.ship.alive) {
+        const botInput = bot.decide(this.world, this.tick);
+        const bullet = bot.ship.applyInput(botInput, FIXED_DT);
+        if (bullet) {
+          this.world.spawn(bullet);
+        }
+      } else {
+        const prevScore = bot.ship?.score ?? 0;
+        if (bot.ship) {
+          bot.ship = null;
+          entry.respawnTimer = RESPAWN_DELAY;
+        }
+        entry.respawnTimer -= FIXED_DT;
+        if (entry.respawnTimer <= 0) {
+          bot.ship = this.#spawnPlayerShip(bot.id, bot.name, prevScore);
         }
       }
     }
@@ -304,3 +336,5 @@ export class Match {
     return this.world.spawn(ship);
   }
 }
+
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   asPlayerId,
   type BinaryFlag,
   type EntityId,
@@ -23,10 +23,10 @@ export interface ShipOptions {
   radius?: number;
   hp?: number;
   score?: number;
-  thrust?: BinaryFlag | number;
+  thrust?: number | boolean;
   thrustTime?: number;
   fireCooldown?: number;
-  invulnerable?: boolean | BinaryFlag | number;
+  invulnerable?: number | boolean;
   shieldTime?: number;
 }
 

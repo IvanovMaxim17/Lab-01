@@ -1,4 +1,4 @@
-﻿import { fetchJson, loadAll, type AssetManifest } from './loader.js';
+﻿import { fetchJson, loadAll } from './loader.js';
 
 async function testLoader(): Promise<void> {
   console.log('Тест 1: завантаження JSON');
@@ -26,4 +26,5 @@ async function testLoader(): Promise<void> {
 testLoader().catch((error: unknown) => {
   console.error('Тест не пройдено:', error);
 });
+
 

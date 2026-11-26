@@ -1,4 +1,5 @@
-﻿import { createPrng, type Prng } from '../prng.js';
+﻿import { SpatialHash } from '../spatial-hash.js';
+import { createPrng, type Prng } from '../prng.js';
 import type { EntityId, EntityKind, WorldEvent } from '../types.js';
 import { Asteroid } from './asteroid.js';
 import { Bullet } from './bullet.js';
@@ -13,6 +14,7 @@ export interface WorldOptions {
   width?: number;
   height?: number;
   seed?: number;
+  useSpatialHash?: boolean;
 }
 
 export class World {
@@ -22,14 +24,19 @@ export class World {
   prng: Prng;
   entities: Map<EntityId, Entity>;
   events: WorldEvent[];
+  readonly useSpatialHash: boolean;
+  readonly #spatialHash: SpatialHash<Entity>;
+  readonly #queryBuffer: Entity[] = [];
 
-  constructor({ width = 800, height = 600, seed = 12345 }: WorldOptions = {}) {
+  constructor({ width = 800, height = 600, seed = 12345, useSpatialHash = true }: WorldOptions = {}) {
     this.width = width;
     this.height = height;
     this.seed = seed;
     this.prng = createPrng(seed);
     this.entities = new Map();
     this.events = [];
+    this.useSpatialHash = useSpatialHash;
+    this.#spatialHash = new SpatialHash<Entity>(width, height, 80);
   }
 
   spawn<T extends Entity>(entity: T): T {
@@ -139,10 +146,22 @@ export class World {
   #checkCollisions(): void {
     const entities = [...this.entities.values()];
 
+    if (this.useSpatialHash) {
+      this.#spatialHash.clear();
+      for (const ent of entities) {
+        if (ent.alive && (ent instanceof Ship || ent instanceof Asteroid)) {
+          this.#spatialHash.insert(ent);
+        }
+      }
+    }
+
     for (const bullet of entities) {
       if (!bullet.alive || !(bullet instanceof Bullet)) continue;
 
-      for (const target of entities) {
+      const candidates = this.useSpatialHash
+        ? this.#spatialHash.query(bullet.pos.x, bullet.pos.y, bullet.radius + 40, this.#queryBuffer)
+        : entities;
+      for (const target of candidates) {
         if (
           bullet === target ||
           !bullet.alive ||
@@ -211,4 +230,6 @@ export class World {
     }
   }
 }
+
+
 

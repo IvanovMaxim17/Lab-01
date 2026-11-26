@@ -16,7 +16,7 @@ COPY shared ./shared
 COPY server ./server
 COPY client ./client
 
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -28,13 +28,11 @@ ENV HOST=0.0.0.0
 ENV LOG_DIR=/app/logs
 ENV APP_VERSION=$APP_VERSION
 
-COPY package.json package-lock.json ./
-COPY shared/package.json ./shared/
-COPY server/package.json ./server/
-
-RUN npm ci --omit=dev --workspace=shared --workspace=server --legacy-peer-deps && npm cache clean --force
-
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/shared/package.json ./shared/
 COPY --from=builder /app/shared/dist ./shared/dist
+COPY --from=builder /app/server/package.json ./server/
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/client/dist ./client/dist
 

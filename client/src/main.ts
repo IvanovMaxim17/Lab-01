@@ -164,8 +164,9 @@ if (!rawApp) {
 const app: HTMLElement = rawApp;
 app.innerHTML = '';
 
+const APP_VERSION = typeof import.meta.env.VITE_APP_VERSION === 'string' && import.meta.env.VITE_APP_VERSION.length > 0 ? import.meta.env.VITE_APP_VERSION : 'v1.0.0';
 const title = document.createElement('h1');
-title.textContent = 'SpaceFight — Multiplayer';
+title.textContent = `SpaceFight — Multiplayer (${APP_VERSION})`;
 
 const hud = document.createElement('p');
 const controls = document.createElement('p');
@@ -1016,3 +1017,11 @@ void initializeLobby();
 
 
 
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Ігноруємо помилку реєстрації SW у середовищах без HTTPS
+    });
+  });
+}

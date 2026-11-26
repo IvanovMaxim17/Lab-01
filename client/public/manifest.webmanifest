@@ -1,0 +1,17 @@
+﻿{
+  "name": "SpaceFight Multiplayer",
+  "short_name": "SpaceFight",
+  "description": "Real-time multiplayer 2D arcade space shooter",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060b16",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

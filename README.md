@@ -447,3 +447,35 @@ We deliberately kept **vanilla TypeScript + DOM API** for the lobby, chat panel,
 | **128** | 7.907 мс | 8.633 мс | 2.913 мс | 15.41% | 99.2 МБ | 5273.7 КБ/с |
 
 - При 128 одночасних клієнтах у кімнаті сервер витрачає лише **7.91 мс** на тік (23.7% від бюджету 33.3 мс); основним обмежувачем при подальшому масштабуванні стає пропускна здатність мережевої серіалізації знімків (`$O(N^2)$` розсилка стану кожного гравця кожному).
+
+---
+
+## Лабораторна робота №8 — Production, Docker, Observability, CI/CD та PWA (`lab-08`, `v1.0.0`)
+
+### 1. Конфігурація та середовище виконання
+- Уся конфігурація сервера (`server/src/config.ts`) валідується при старті через **Zod** (`PORT`, `HOST`, `NODE_ENV`, `LOG_LEVEL`, `LOG_DIR`, `APP_VERSION`, `ALLOWED_ORIGINS`, `MAX_CONNECTIONS_PER_IP`, `MAX_ROOMS`, `MAX_PLAYERS_PER_ROOM`). Шаблон змінних наведено у `.env.example`.
+- Штамп версії (`APP_VERSION` / `VITE_APP_VERSION`) відображається в інтерфейсі клієнта, у відповідях `/health`, `/ready`, повідомленні `joined` та в логах сервера.
+
+### 2. Спостережуваність (Observability) та експлуатаційна надійність
+- **Структуроване JSON-логування (`pino`)**: усі події життєвого циклу сервера, підключень і помилок записуються у форматі JSON з автоматичним маскуванням секретних полів (`redact`).
+- **Проби стану та Prometheus-метрики**:
+  - `GET /health` — liveness-проба (`status`, `version`, `uptime`).
+  - `GET /ready` — readiness-проба (`200 ready` під час роботи та `503 shutting_down` при зупинці).
+  - `GET /metrics` — експорт метрик у форматі **Prometheus** (`prom-client`): `spacefight_active_players`, `spacefight_active_rooms`, `spacefight_ws_messages_total`, `spacefight_ws_bytes_total`, `spacefight_rejections_total`, `spacefight_tick_duration_seconds` та стандартні метрики Node.js/V8.
+- **Захист та обмеження**:
+  - Перевірка заголовка `Origin` під час WebSocket `upgrade` (політика `ALLOWED_ORIGINS`, відхилення кодом `403`).
+  - Обмеження кількості одночасних WebSocket-сесій з одного IP (`MAX_CONNECTIONS_PER_IP`, відхилення кодом `429`), rate-limit повідомлень (`120 msg/s`), таймаут приєднання (`5 с`) і heartbeat (`15 с`).
+- **Коректне завершення (`Graceful Shutdown`)**:
+  - Перехоплення `SIGINT`, `SIGTERM`, `uncaughtException` та `unhandledRejection`: розсилка клієнтам повідомлення `{"type":"shutdown"}`, закриття WebSocket із кодом `1001`, зупинка ігрових циклів і флашинг журналів матчів із запобіжним таймаутом 5 с.
+
+### 3. Контейнеризація та розгортання (`Dockerfile` + `docker-compose.yml`)
+- Багатоетапний `Dockerfile` (`node:22-alpine`): окремий етап збірки (`builder`) і мінімальний runtime-образ (`runner`) без dev-залежностей, запуск від непривілейованого користувача `USER node` та вбудований `HEALTHCHECK`.
+- Запуск через Docker Compose: `docker compose up -d --build`.
+
+### 4. PWA та кешування статики
+- Реалізовано `client/public/manifest.webmanifest`, векторну іконку `icon.svg` та Service Worker (`client/public/sw.js`) зі стратегією **Network-First** для HTML-навігації та **Cache-First** для статичних ресурсів оболонки.
+- HTTP-сервер віддає хешовані файли `/assets/*` із заголовком `Cache-Control: public, max-age=31536000, immutable`, а `index.html` і `sw.js` — із `Cache-Control: no-cache`.
+
+### 5. CI/CD (`.github/workflows/ci.yml`)
+- Автоматична перевірка на кожен push / PR (`typecheck` → `lint` → `build` → `vitest --coverage` → `playwright test`).
+- При створенні релізного тегу (`v*` або `lab-*`) автоматично збирається та публікується Docker-образ у **GitHub Container Registry (GHCR)**.

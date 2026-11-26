@@ -2,6 +2,8 @@
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { Match, type MatchStats } from './match.js';
+import { config } from './config.js';
+import { activeRoomsGauge, rejectionsTotal } from './observability.js';
 
 export interface ClientWebSocket extends WebSocket {
   isAlive: boolean;
@@ -9,6 +11,7 @@ export interface ClientWebSocket extends WebSocket {
   room: Room | null;
   playerName: string | null;
   messageCount: number;
+  clientIp?: string;
 }
 
 export interface RoomSummary {
@@ -88,9 +91,15 @@ export class RoomManager extends EventEmitter {
       throw new Error('Room name must contain 1–30 characters');
     }
 
+    if (this.rooms.size >= config.maxRooms) {
+      rejectionsTotal.inc({ reason: 'max_rooms' });
+      throw new Error(`Maximum rooms limit (${config.maxRooms}) reached`);
+    }
+
     const room = new Room(normalizedName, asteroidCount, difficulty);
 
     this.rooms.set(room.id, room);
+    activeRoomsGauge.set(this.rooms.size);
     this.emit('roomCreated', room);
 
     return room;
@@ -113,6 +122,7 @@ export class RoomManager extends EventEmitter {
 
     room.match.stop();
     this.rooms.delete(id);
+    activeRoomsGauge.set(this.rooms.size);
     this.emit('roomDeleted', room);
 
     return true;
@@ -132,5 +142,6 @@ export class RoomManager extends EventEmitter {
     for (const room of this.rooms.values()) {
       room.match.stop();
     }
+    activeRoomsGauge.set(0);
   }
 }

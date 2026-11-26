@@ -1,0 +1,33 @@
+﻿services:
+  spacefight:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-v1.0.0}
+        VITE_APP_VERSION: ${APP_VERSION:-v1.0.0}
+    image: ghcr.io/ivanovmaxim17/spacefight:${APP_VERSION:-latest}
+    container_name: spacefight-server
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_DIR: /app/logs
+      APP_VERSION: ${APP_VERSION:-v1.0.0}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      MAX_CONNECTIONS_PER_IP: ${MAX_CONNECTIONS_PER_IP:-20}
+      MAX_ROOMS: ${MAX_ROOMS:-20}
+      MAX_PLAYERS_PER_ROOM: ${MAX_PLAYERS_PER_ROOM:-16}
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { config } from './config.js';
 import { RoomManager, type Room } from './rooms.js';
 import { attachWebSocket } from './websocket.js';
+import { logger as appLogger, metricsRegistry } from './observability.js';
 import { createMatchLogger } from './log/match-logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,6 +53,7 @@ roomManager.on('roomDeleted', (room: Room) => {
 });
 
 const mimeTypes: Readonly<Record<string, string>> = {
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -279,8 +281,12 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<v
     const contentType =
       mimeTypes[extension] ?? 'application/octet-stream';
 
+    const cacheControl = pathname.startsWith('/assets/')
+      ? 'public, max-age=31536000, immutable'
+      : 'no-cache';
     res.writeHead(200, {
       'Content-Type': contentType,
+      'Cache-Control': cacheControl,
     });
 
     res.end(content);
@@ -297,8 +303,37 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && rawUrl === '/health') {
     sendJson(res, 200, {
       status: 'ok',
-      uptime: process.uptime(),
+      version: config.appVersion,
+      uptime: Number(process.uptime().toFixed(2)),
     });
+
+    return;
+  }
+
+  if (req.method === 'GET' && rawUrl === '/ready') {
+    if (isShuttingDown) {
+      sendJson(res, 503, {
+        status: 'shutting_down',
+        version: config.appVersion,
+      });
+      return;
+    }
+    sendJson(res, 200, {
+      status: 'ready',
+      version: config.appVersion,
+      rooms: roomManager.rooms.size,
+    });
+
+    return;
+  }
+
+  if (req.method === 'GET' && rawUrl === '/metrics') {
+    const payload = await metricsRegistry.metrics();
+    res.writeHead(200, {
+      'Content-Type': metricsRegistry.contentType,
+      'Cache-Control': 'no-store',
+    });
+    res.end(payload);
 
     return;
   }
@@ -348,20 +383,26 @@ server.listen(config.port, () => {
 
 let isShuttingDown = false;
 
-function shutdown(): void {
+function shutdown(exitCode = 0): void {
   if (isShuttingDown) {
     return;
   }
 
   isShuttingDown = true;
-  console.log('Shutting down server...');
+  appLogger.info({ exitCode }, 'Graceful shutdown initiated');
+
+  const forceTimer = setTimeout(() => {
+    appLogger.error('Forced shutdown after 5s timeout');
+    process.exit(1);
+  }, 5000);
+  forceTimer.unref();
 
   roomManager.closeAll();
   webSocketServer.close();
 
   server.close(async (error) => {
     if (error) {
-      console.error('Shutdown error:', error);
+      appLogger.error({ err: error }, 'HTTP server close error');
       process.exitCode = 1;
     }
 
@@ -372,23 +413,38 @@ function shutdown(): void {
       });
 
       await logger.close();
-      console.log('Log file flushed and closed.');
+      appLogger.info('Match log flushed and server stopped');
     } catch (loggerError) {
-      console.error('Logger shutdown error:', loggerError);
+      appLogger.error({ err: loggerError }, 'Logger shutdown error');
       process.exitCode = 1;
     }
 
-    if (!error) {
-      console.log('Server closed.');
-    }
-
-    if (process.exitCode !== 1) {
+    clearTimeout(forceTimer);
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    } else if (process.exitCode !== 1) {
       process.exitCode = 0;
     }
   });
 }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown(0));
+process.on('SIGTERM', () => shutdown(0));
 
+process.on('uncaughtException', (err) => {
+  appLogger.fatal({ err }, 'Uncaught exception — shutting down');
+  shutdown(1);
+});
 
+process.on('unhandledRejection', (reason) => {
+  appLogger.error({ err: reason }, 'Unhandled promise rejection');
+});
+
+if (process.env.NODE_ENV === 'test' && !process.stdin.isTTY) {
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk: string) => {
+    if (chunk.trim() === 'SIGTERM') {
+      shutdown(0);
+    }
+  });
+}
